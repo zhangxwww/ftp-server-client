@@ -300,15 +300,18 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
     strncpy(filename, param, strlen(param));
     filename[strlen(param)] = '\0';
 
-    FILE * file = fopen(filename, "rb+");
-    if (file == NULL) {
+    FILE * file;
+    if (sockif->rest == 0) {
         file = fopen(filename, "wb");
-        if (file == NULL) {
-            printf("Error can't open file %s\n", filename);
-            error450(sockif, NULL);
-            clear_data_socket(sockif);
-            return 1;
-        }
+    }
+    else {
+        file = fopen(filename, "rb+");
+    }
+    if (file == NULL) {
+        printf("Error can't open file %s\n", filename);
+        error450(sockif, NULL);
+        clear_data_socket(sockif);
+        return 1;
     }
     char block[BUF_SIZE];
     memset(block, 0, BUF_SIZE);
@@ -323,7 +326,7 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
             if (len == 0) {
                 break;
             }
-            if (len != fwrite(block, 1, sizeof(block), file)) {
+            if (len != fwrite(block, 1, len, file)) {
                 printf("Error occurs when reciving file\n");
                 error426(sockif, NULL);
             }

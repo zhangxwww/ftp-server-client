@@ -5,8 +5,9 @@
 makefile
 *.o
 test*
+auto*
 
-
+*.ipynb
 
 /library/
 /temp/
