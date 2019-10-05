@@ -237,6 +237,10 @@ int retr(socket_info_t * sockif, char param[PARAM_LEN]) {
         error500(sockif, NULL);
         return 1;
     }
+    if (strncmp(param, "../", 3) == 0) {
+        error450(sockif, NULL);
+        return 1;
+    }
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
     int err;
@@ -283,6 +287,10 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
     }
     if (param == NULL) {
         error500(sockif, NULL);
+        return 1;
+    }
+    if (strncmp(param, "../", 3) == 0) {
+        error450(sockif, NULL);
         return 1;
     }
     int err;
@@ -542,21 +550,27 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
             char * buffer;
             char filename[PATH_LEN];
             char * token_ptr;
+            int count = 0;
+            char info[BUF_SIZE];
+            memset(info, 0, BUF_SIZE);
             for (token_ptr = strtok_r(param, " ", &buffer);
                 token_ptr != NULL;
                 token_ptr = strtok_r(NULL, " ", &buffer)) {
                 memset(filename, 0, PATH_LEN);
                 strncpy(filename, token_ptr, strlen(token_ptr));
                 filename[strlen(filename)] = '\0';
-                char info[BUF_SIZE];
                 err = generate_file_info(filename, info);
                 if (err != 0) {
                     break;
                 }
-                if (send(connfd, info, strlen(info), 0) < 0) {
-                    err = 426;
-                    break;
-                }
+                ++count;
+            }
+            char res[BUF_SIZE];
+            memset(res, 0, BUF_SIZE);
+            sprintf(res, "total %d\r\n%s", count, info);
+            res[strlen(res)] = '\0';
+            if (send(connfd, res, strlen(res), 0) < 0) {
+                err = 426;
             }
         }
     }

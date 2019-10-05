@@ -225,26 +225,30 @@ int traverse_dir(char dirname[PATH_LEN], int connfd) {
         printf("Error opendir %s\n", dirname);
         return 450;
     }
+    int count = 0;
+    char info[BUF_SIZE];
     while ((entry = readdir(dir))) {
         char filename[PATH_LEN];
         memset(filename, 0, PATH_LEN);
         strncpy(filename, entry->d_name, strlen(entry->d_name));
-        char info[BUF_SIZE];
         err = generate_file_info(filename, info);
         if (err != 0) {
             break;
         }
-        if (send(connfd, info, strlen(info), 0) < 0) {
-            err = 426;
-            break;
-        }
+        ++count;
+    }
+    char res[BUF_SIZE];
+    memset(res, 0, BUF_SIZE);
+    sprintf(res, "total %d\r\n%s", count, info);
+    res[strlen(res)] = '\0';
+    if (send(connfd, res, strlen(res), 0) < 0) {
+        err = 426;
     }
     closedir(dir);
     return err;
 }
 
 int generate_file_info(char filename[PATH_LEN], char info[BUF_SIZE]) {
-    memset(info, 0, BUF_SIZE);
     struct stat st;
     int err = stat(filename, &st);
     if (err < 0) {
@@ -293,7 +297,11 @@ int generate_file_info(char filename[PATH_LEN], char info[BUF_SIZE]) {
     char * time = ctime(&st.st_mtime);
     char mtime[512] = "";
     strncpy(mtime, time, strlen(time) - 1);
-    sprintf(info, "%s %d %s %s    %d %s %s\r\n", permission, links, user, group, size, mtime, filename);
+    char tmp[BUF_SIZE];
+    memset(tmp, 0, BUF_SIZE);
+    sprintf(tmp, "%s   %d %s     %s    %d %s %s\r\n", permission, links, user, group, size, mtime, filename);
+    tmp[strlen(tmp)] = '\0';
+    strcat(info, tmp);
 
     return 0;
 }
