@@ -26,7 +26,7 @@ class FTP:
         self.is_pasv = None
         self.file = None
 
-    def connect(self, host='127.0.0.1', port=21):
+    def connect(self, host, port):
         self.ctrl_sock = socket.create_connection((host, port))
         self.file = self.ctrl_sock.makefile('r', encoding=ENCODING)
         res = self.get_response()
@@ -210,7 +210,7 @@ class FTP:
         if line[-2:] == '\r\n':
             line = line[:-2]
         elif line[-1:] in ['\r', '\n']:
-            line = line[-1:]
+            line = line[:-1]
         return line
 
     def send_request(self, req):

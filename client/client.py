@@ -25,14 +25,23 @@ class Client:
         self.refresh_button = None
         self.pasv_box = None
 
+        self.ftp = ftp.FTP()
         self.app = wx.App()
         self.initGUI()
         self.bindEvents()
         self.app.MainLoop()
-        self.ftp = ftp.FTP()
 
     def connect(self, _):
-        print('Connect')
+        host = self.ip_input.GetAddress()
+        port = self.port_input.GetValue()
+        try:
+            port = int(port)
+            if port > 65535:
+                return
+        except ValueError:
+            return
+        res = self.ftp.connect(host, port)
+        self.prompt_show.write(res)
 
     def login(self, _):
         print('login')
@@ -89,7 +98,9 @@ class Client:
         ip_text = wx.StaticText(panel, -1, 'IP')
         port_text = wx.StaticText(panel, -1, 'Port')
         ip_input = wx.lib.masked.IpAddrCtrl(panel, -1)
-        port_input = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT)
+        ip_input.SetValue('127.0.0.1')
+        port_input = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT, validator=PortValidator())
+        port_input.SetValue('21')
         connect_button = wx.Button(panel, -1, 'Connect')
 
         connection_box.Add(ip_text, 0, wx.ALL | wx.CENTER, 5)
@@ -184,6 +195,39 @@ class Client:
     def initBottom(panel, vbox):
         info = wx.StaticText(panel, -1, 'Copyright © Zhang Xinwei 2019')
         vbox.Add(info, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
+
+
+class PortValidator(wx.Validator):
+    def __init__(self):
+        wx.Validator.__init__(self)
+        self.valid_char = list(map(str, range(10)))
+        self.len = 0
+        self.Bind(wx.EVT_CHAR, self.OnCharChanged)
+
+    def Clone(self):
+        return PortValidator()
+
+    def Validate(self, win):
+        return True
+
+    def TransferToWindow(self):
+        return True
+
+    def OnCharChanged(self, event):
+        key = event.GetKeyCode()
+        if key == 8:
+            self.len -= 1
+            if self.len < 0:
+                self.len = 0
+            event.Skip()
+            return
+        char = chr(key)
+        if char in self.valid_char:
+            if self.len < 5:
+                self.len += 1
+                event.Skip()
+                return True
+        return False
 
 
 if __name__ == '__main__':
