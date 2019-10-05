@@ -3,15 +3,64 @@
 import wx
 import wx.lib.masked
 
+import ftp
+
+
 class Client:
     def __init__(self):
+
+        self.main_window = None
+        self.ip_input = None
+        self.port_input = None
+        self.connect_button = None
+        self.username_input = None
+        self.password_input = None
+        self.login_button = None
+        self.quit_button = None
+        self.prompt_show = None
+        self.prompt_input = None
+        self.cwd = None
+        self.file_list = None
+        self.upload_button = None
+        self.refresh_button = None
+        self.pasv_box = None
+
         self.app = wx.App()
         self.initGUI()
+        self.bindEvents()
         self.app.MainLoop()
+        self.ftp = ftp.FTP()
+
+    def connect(self, _):
+        print('Connect')
+
+    def login(self, _):
+        print('login')
+
+    def quit(self, _):
+        print('quit')
+
+    def refresh(self, _):
+        print('refresh')
+
+    def upload(self, _):
+        print('upload')
+
+    def changdir(self, _):
+        print('cd')
+
+    def removedir(self, _):
+        print('rm')
+
+    def rename(self, _):
+        print('rename')
+
+    def rightClickItem(self, event):
+        print('Right click on {}'.format(event.GetIndex()))
 
     def initGUI(self):
-        main_window = wx.Frame(None, title='FTP Client', size=(640, 976))
-        panel = wx.Panel(main_window)
+        self.main_window = wx.Frame(None, title='FTP Client', size=(640, 976))
+        panel = wx.Panel(self.main_window)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
         self.initConnectionArea(panel, vbox)
@@ -21,7 +70,15 @@ class Client:
         panel.SetSizer(vbox)
         panel.Fit()
 
-        main_window.Show(True)
+        self.main_window.Show(True)
+
+    def bindEvents(self):
+        self.connect_button.Bind(wx.EVT_BUTTON, self.connect)
+        self.login_button.Bind(wx.EVT_BUTTON, self.login)
+        self.quit_button.Bind(wx.EVT_BUTTON, self.quit)
+        self.refresh_button.Bind(wx.EVT_BUTTON, self.refresh)
+        self.upload_button.Bind(wx.EVT_BUTTON, self.upload)
+        self.file_list.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.rightClickItem)
 
     def initConnectionArea(self, panel, vbox):
         connection_info = wx.StaticBox(panel, -1, 'Connection info')
@@ -59,6 +116,14 @@ class Client:
 
         vbox.Add(connection_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
+        self.ip_input = ip_input
+        self.port_input = port_input
+        self.connect_button = connect_button
+        self.username_input = username_input
+        self.password_input = password_input
+        self.login_button = login_button
+        self.quit_button = quit_button
+
     def initPromptArea(self, panel, vbox):
         prompt = wx.StaticBox(panel, -1, 'Prompt')
 
@@ -71,6 +136,9 @@ class Client:
         prompt_sizer.Add(prompt_input, 0, wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.CENTER | wx.EXPAND, 10)
 
         vbox.Add(prompt_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
+
+        self.prompt_show = prompt_show
+        self.prompt_input = prompt_input
 
     def initExplorerArea(self, panel, vbox):
         explorer = wx.StaticBox(panel, -1, 'Explorer')
@@ -106,9 +174,17 @@ class Client:
 
         vbox.Add(explorer_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
-    def initBottom(self, panel, vbox):
+        self.cwd = cwd
+        self.file_list = file_list
+        self.upload_button = upload
+        self.refresh_button = refresh
+        self.pasv_box = pasv
+
+    @staticmethod
+    def initBottom(panel, vbox):
         info = wx.StaticText(panel, -1, 'Copyright © Zhang Xinwei 2019')
         vbox.Add(info, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
+
 
 if __name__ == '__main__':
     Client()
