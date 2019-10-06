@@ -2,6 +2,8 @@
 
 import wx
 import wx.lib.masked
+import ctypes
+import sys
 
 import ftp
 
@@ -32,7 +34,7 @@ class Client:
         self.app.MainLoop()
 
     def connect(self, _):
-        host = self.ip_input.GetAddress()
+        host = self.ip_input.GetValue()
         port = self.port_input.GetValue()
         try:
             port = int(port)
@@ -41,19 +43,48 @@ class Client:
         except ValueError:
             return
         res = self.ftp.connect(host, port)
-        self.prompt_show.write(res)
+        self.showPrompt(res)
 
     def login(self, _):
-        print('login')
+        username = self.username_input.GetValue()
+        password = self.password_input.GetValue()
+        cmd, res = self.ftp.USER(username)
+        self.showPrompt((cmd, res))
+        if res[0] == '3':
+            cmd, res = self.ftp.PASS(password)
+            self.showPrompt((cmd, res))
+        cmd, res = self.ftp.SYST()
+        self.showPrompt((cmd, res))
+        self.refresh(None)
+
 
     def quit(self, _):
-        print('quit')
+        res = self.ftp.QUIT()
+        self.showPrompt(res)
 
     def refresh(self, _):
-        print('refresh')
+        if self.pasv_box.GetValue():
+            cmd, res = self.ftp.PASV()
+        else:
+            cmd, res = self.ftp.PORT()
+        self.showPrompt((cmd, res))
+        cmd, res = self.ftp.TYPE('A')
+        self.showPrompt((cmd, res))
+        try:
+            cmd, res, lines = self.ftp.LIST(None)
+        except ftp.FTPError as e:
+            self.showPrompt((None, str(e)))
+            return
+        self.showPrompt((cmd, res[0]))
+        self.showPrompt((None, res[1]))
+        # TODO show list
+        print(lines)
 
     def upload(self, _):
         print('upload')
+
+    def download(self, _):
+        print('download')
 
     def changdir(self, _):
         print('cd')
@@ -66,6 +97,19 @@ class Client:
 
     def rightClickItem(self, event):
         print('Right click on {}'.format(event.GetIndex()))
+
+    def showPrompt(self, line):
+        prompt = ''
+        cmd, res = line
+        if cmd:
+            prompt = 'ftp> ' + prompt + cmd + '\n'
+        if isinstance(res, tuple) or isinstance(res, list):
+            prompt = prompt + ''.join(res)
+            prompt = prompt + '\n'
+        if isinstance(res, str):
+            prompt = prompt + res
+            prompt = prompt + '\n'
+        self.prompt_show.write(prompt)
 
     def initGUI(self):
         self.main_window = wx.Frame(None, title='FTP Client', size=(640, 976))
@@ -95,10 +139,10 @@ class Client:
         connection_sizer = wx.StaticBoxSizer(connection_info, wx.VERTICAL)
         connection_box = wx.BoxSizer(wx.HORIZONTAL)
 
-        ip_text = wx.StaticText(panel, -1, 'IP')
+        ip_text = wx.StaticText(panel, -1, 'Host')
         port_text = wx.StaticText(panel, -1, 'Port')
-        ip_input = wx.lib.masked.IpAddrCtrl(panel, -1)
-        ip_input.SetValue('127.0.0.1')
+        ip_input = wx.TextCtrl(panel, -1)
+        ip_input.SetValue('ftp.sjtu.edu.cn')
         port_input = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT, validator=PortValidator())
         port_input.SetValue('21')
         connect_button = wx.Button(panel, -1, 'Connect')
@@ -124,6 +168,9 @@ class Client:
         login_box.Add(login_button, 0, wx.ALL | wx.CENTER, 5)
         login_box.Add(quit_button, 0, wx.ALL | wx.CENTER, 5)
         connection_sizer.Add(login_box, 0, wx.ALL | wx.CENTER, 10)
+
+        username_input.SetValue('anonymous')
+        password_input.SetValue('anonymous@')
 
         vbox.Add(connection_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
@@ -176,6 +223,7 @@ class Client:
         upload = wx.Button(panel, -1, 'Upload')
         refresh = wx.Button(panel, -1, 'Refresh')
         pasv = wx.CheckBox(panel, -1, 'Pasv')
+        pasv.SetValue(False)
 
         lower_box.Add(refresh, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(upload, 0, wx.ALL | wx.CENTER, 5)
@@ -229,6 +277,17 @@ class PortValidator(wx.Validator):
                 return True
         return False
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
 
 if __name__ == '__main__':
     Client()
+    '''
+    if is_admin():
+        Client()
+    else:
+        ctypes.windll.shell32.ShellExecuteW(None, 'runas', sys.executable, __file__, None, 1)
+    '''
