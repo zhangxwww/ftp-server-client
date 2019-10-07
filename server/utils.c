@@ -225,7 +225,6 @@ int traverse_dir(char dirname[PATH_LEN], int connfd) {
         printf("Error opendir %s\n", dirname);
         return 450;
     }
-    int count = 0;
     char info[BUF_SIZE];
     while ((entry = readdir(dir))) {
         char filename[PATH_LEN];
@@ -235,20 +234,17 @@ int traverse_dir(char dirname[PATH_LEN], int connfd) {
         if (err != 0) {
             break;
         }
-        ++count;
-    }
-    char res[BUF_SIZE];
-    memset(res, 0, BUF_SIZE);
-    sprintf(res, "total %d\r\n%s", count, info);
-    res[strlen(res)] = '\0';
-    if (send(connfd, res, strlen(res), 0) < 0) {
-        err = 426;
+        if (send(connfd, info, strlen(info), 0) < 0) {
+            err = 426;
+            break;
+        }
     }
     closedir(dir);
     return err;
 }
 
 int generate_file_info(char filename[PATH_LEN], char info[BUF_SIZE]) {
+    memset(info, 0, BUF_SIZE);
     struct stat st;
     int err = stat(filename, &st);
     if (err < 0) {
@@ -294,14 +290,38 @@ int generate_file_info(char filename[PATH_LEN], char info[BUF_SIZE]) {
     char * user = getpwuid(st.st_uid)->pw_name;
     char * group = getgrgid(st.st_gid)->gr_name;
     int size = (int) st.st_size;
-    char * time = ctime(&st.st_mtime);
-    char mtime[512] = "";
-    strncpy(mtime, time, strlen(time) - 1);
+
+    struct tm * t = localtime(&st.st_mtime);
+    char mtime[512];
+    memset(mtime, 0, 512);
+    char month[5];
+    memset(month, 0, 5);
+    switch (t->tm_mon) {
+        case 0:  strncpy(month, "Jan", 3); break;
+        case 1:  strncpy(month, "Feb", 3); break;
+        case 2:  strncpy(month, "Mar", 3); break;
+        case 3:  strncpy(month, "Apr", 3); break;
+        case 4:  strncpy(month, "May", 3); break;
+        case 5:  strncpy(month, "Jun", 3); break;
+        case 6:  strncpy(month, "July", 4); break;
+        case 7:  strncpy(month, "Aug", 3); break;
+        case 8:  strncpy(month, "Sept", 4); break;
+        case 9:  strncpy(month, "Oct", 3); break;
+        case 10: strncpy(month, "Nov", 3); break;
+        case 11: strncpy(month, "Dec", 3); break;
+    }
+    month[strlen(month)] = '\0';
+    if (t->tm_year == 19) {
+        sprintf(mtime, "%s %d %d:%d", month, t->tm_mday, t->tm_hour, t->tm_min);
+    }
+    else {
+        sprintf(mtime, "%s %d %d", month, t->tm_mday, t->tm_year + 1900);
+    }
+    mtime[strlen(mtime)] = '\0';
     char tmp[BUF_SIZE];
     memset(tmp, 0, BUF_SIZE);
     sprintf(tmp, "%s   %d %s     %s    %d %s %s\r\n", permission, links, user, group, size, mtime, filename);
     tmp[strlen(tmp)] = '\0';
     strcat(info, tmp);
-
     return 0;
 }

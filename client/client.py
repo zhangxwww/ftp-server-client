@@ -2,6 +2,7 @@
 
 import wx
 import re
+import os
 
 import ftp
 
@@ -24,6 +25,12 @@ class Client:
         self.upload_button = None
         self.refresh_button = None
         self.pasv_box = None
+        self.cd_button = None
+        self.rm_button = None
+        self.rename_button = None
+        self.download_button = None
+
+        self.files = []
 
         self.ftp = ftp.FTP()
         self.app = wx.App()
@@ -60,33 +67,53 @@ class Client:
         self.showPrompt(res)
 
     def refresh(self, _):
+        self.updatePWD()
+        self.updateList()
+
+    def upload(self, _):
+        file_dialog = wx.FileDialog(self.main_window, message='Choose upload file', style=wx.FD_OPEN)
+        dia_res = file_dialog.ShowModal()
+        if dia_res != wx.ID_OK:
+            return
+        path = file_dialog.GetPath()
+        filename = path.split(os.sep)[-1]
+        res = self.ftp.TYPE('I')
+        self.showPrompt(res)
         if self.pasv_box.GetValue():
             cmd, res = self.ftp.PASV()
         else:
             cmd, res = self.ftp.PORT()
         self.showPrompt((cmd, res))
-        cmd, res = self.ftp.TYPE('A')
-        self.showPrompt((cmd, res))
-        self.updatePWD()
+        cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
+        self.showPrompt((cmd, res[0]))
+        self.showPrompt((None, res[1]))
         self.updateList()
 
-    def upload(self, _):
-        print('upload')
+    def changeDir(self, dir_name):
+        print('change {}'.format(dir_name))
 
-    def download(self, _):
-        print('download')
+    def removeDir(self, dir_name):
+        print('remove {}'.format(dir_name))
 
-    def changdir(self, _):
-        print('cd')
+    def download(self, filename):
+        print('download {}'.format(filename))
 
-    def removedir(self, _):
-        print('rm')
+    def rename(self, old, new):
+        print('rename {} to {}'.format(old, new))
 
-    def rename(self, _):
-        print('rename')
-
-    def rightClickItem(self, event):
-        print('Right click on {}'.format(event.GetIndex()))
+    def leftClickItem(self, event):
+        row = self.files[event.GetIndex()]
+        print(row)
+        if row[0] == 'd':
+            self.cd_button.Enable()
+            self.rm_button.Enable()
+            self.rename_button.Disable()
+            self.download_button.Disable()
+        else:
+            self.rename_button.Enable()
+            self.download_button.Enable()
+            self.cd_button.Disable()
+            self.rm_button.Disable()
 
     def showPrompt(self, line):
         prompt = ''
@@ -110,6 +137,13 @@ class Client:
         self.showPrompt((cmd, res))
 
     def updateList(self):
+        if self.pasv_box.GetValue():
+            cmd, res = self.ftp.PASV()
+        else:
+            cmd, res = self.ftp.PORT()
+        self.showPrompt((cmd, res))
+        cmd, res = self.ftp.TYPE('A')
+        self.showPrompt((cmd, res))
         try:
             cmd, res, lines = self.ftp.LIST(None)
         except ftp.FTPError as e:
@@ -117,11 +151,27 @@ class Client:
             return
         self.showPrompt((cmd, res[0]))
         self.showPrompt((None, res[1]))
+        parsed = []
         for line in lines:
-            self.showListEachLine(line)
+            p = self.parseListEachLine(line)
+            if p:
+                parsed.append(p)
+        parsed = sorted(parsed, key=lambda x: x[1])
+        if len(parsed) > 0 and parsed[0][1][:1] != '.':
+            parsed.insert(0, ('d', '.', '', ''))
+        if len(parsed) > 1 and parsed[1][1][:2] != '..':
+            parsed.insert(1, ('d', '..', '', ''))
+        self.file_list.ClearAll()
+        self.file_list.AppendColumn('Type')
+        self.file_list.AppendColumn('Filename')
+        self.file_list.AppendColumn('Size')
+        self.file_list.AppendColumn('Last modified')
+        for p in parsed:
+            self.file_list.Append(p)
+        self.files = parsed
         self.resizeList()
 
-    def showListEachLine(self, line):
+    def parseListEachLine(self, line):
         line = line.strip()
         reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*)\s*(.*)$')
         match = reg.search(line)
@@ -129,7 +179,7 @@ class Client:
             return
         file_type, file_size, last_modified, filename = match.groups()
         file_size = self.readable_size(int(file_size))
-        self.file_list.Append([file_type, filename, file_size, last_modified])
+        return file_type, filename, file_size, last_modified
 
     @staticmethod
     def readable_size(file_size):
@@ -143,9 +193,8 @@ class Client:
                 break
         return str(file_size) + ' ' + suf
 
-
     def initGUI(self):
-        self.main_window = wx.Frame(None, title='FTP Client', size=(640, 976))
+        self.main_window = wx.Frame(None, title='FTP Client', size=(640, 768))
         panel = wx.Panel(self.main_window)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
@@ -164,7 +213,7 @@ class Client:
         self.quit_button.Bind(wx.EVT_BUTTON, self.quit)
         self.refresh_button.Bind(wx.EVT_BUTTON, self.refresh)
         self.upload_button.Bind(wx.EVT_BUTTON, self.upload)
-        self.file_list.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.rightClickItem)
+        self.file_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.leftClickItem)
 
     def initConnectionArea(self, panel, vbox):
         connection_info = wx.StaticBox(panel, -1, 'Connection info')
@@ -175,7 +224,8 @@ class Client:
         ip_text = wx.StaticText(panel, -1, 'Host')
         port_text = wx.StaticText(panel, -1, 'Port')
         ip_input = wx.TextCtrl(panel, -1)
-        ip_input.SetValue('ftp.sjtu.edu.cn')
+        # ip_input.SetValue('ftp.sjtu.edu.cn')
+        ip_input.SetValue('127.0.0.1')
         port_input = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT, validator=PortValidator())
         port_input.SetValue('21')
         connect_button = wx.Button(panel, -1, 'Connect')
@@ -200,7 +250,7 @@ class Client:
         login_box.Add(password_input, 0, wx.ALL | wx.CENTER, 5)
         login_box.Add(login_button, 0, wx.ALL | wx.CENTER, 5)
         login_box.Add(quit_button, 0, wx.ALL | wx.CENTER, 5)
-        connection_sizer.Add(login_box, 0, wx.ALL | wx.CENTER, 10)
+        connection_sizer.Add(login_box, 0, wx.ALL | wx.CENTER, 5)
 
         username_input.SetValue('anonymous')
         password_input.SetValue('anonymous@')
@@ -220,11 +270,11 @@ class Client:
 
         prompt_sizer = wx.StaticBoxSizer(prompt, wx.VERTICAL)
 
-        prompt_show = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT | wx.TE_MULTILINE | wx.TE_READONLY, size=(-1, 240))
+        prompt_show = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT | wx.TE_MULTILINE | wx.TE_READONLY, size=(-1, 100))
         prompt_input = wx.TextCtrl(panel, -1, style=wx.ALIGN_LEFT)
 
-        prompt_sizer.Add(prompt_show, 0, wx.TOP | wx.LEFT | wx.RIGHT | wx.CENTER | wx.EXPAND, 10)
-        prompt_sizer.Add(prompt_input, 0, wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.CENTER | wx.EXPAND, 10)
+        prompt_sizer.Add(prompt_show, 0, wx.TOP | wx.LEFT | wx.RIGHT | wx.CENTER | wx.EXPAND, 5)
+        prompt_sizer.Add(prompt_input, 0, wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.CENTER | wx.EXPAND, 5)
 
         vbox.Add(prompt_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
@@ -241,34 +291,51 @@ class Client:
 
         higher_box.Add(cwd, 0, wx.ALL | wx.ALIGN_LEFT | wx.EXPAND, 5)
 
-        explorer_sizer.Add(higher_box, 0, wx.ALL | wx.CENTER, 10)
+        explorer_sizer.Add(higher_box, 0, wx.ALL | wx.CENTER, 5)
 
-        file_list = wx.ListCtrl(panel, -1, style=wx.LC_REPORT, size=(-1, 240))
+        file_list = wx.ListCtrl(panel, -1, style=wx.LC_REPORT, size=(-1, 150))
         file_list.AppendColumn('Type')
         file_list.AppendColumn('Filename')
         file_list.AppendColumn('Size')
         file_list.AppendColumn('Last modified')
 
-
-        explorer_sizer.Add(file_list, 0, wx.ALL | wx.CENTER | wx.EXPAND, 10)
+        explorer_sizer.Add(file_list, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
         lower_box = wx.BoxSizer(wx.HORIZONTAL)
+        lower_lower_box = wx.BoxSizer(wx.HORIZONTAL)
         upload = wx.Button(panel, -1, 'Upload')
+        download = wx.Button(panel, -1, 'Download')
+        rename = wx.Button(panel, -1, 'Rename')
+        cd = wx.Button(panel, -1, 'Change Directory')
+        rm = wx.Button(panel, -1, 'Remove Directory')
         refresh = wx.Button(panel, -1, 'Refresh')
         pasv = wx.CheckBox(panel, -1, 'Pasv')
         pasv.SetValue(True)
+        download.Disable()
+        rename.Disable()
+        cd.Disable()
+        rm.Disable()
 
         lower_box.Add(refresh, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(upload, 0, wx.ALL | wx.CENTER, 5)
-        lower_box.Add(pasv, 0, wx.ALL | wx.CENTER, 5)
+        lower_box.Add(download, 0, wx.ALL | wx.CENTER, 5)
+        lower_lower_box.Add(rename, 0, wx.ALL | wx.CENTER, 5)
+        lower_lower_box.Add(cd, 0, wx.ALL | wx.CENTER, 5)
+        lower_lower_box.Add(rm, 0, wx.ALL | wx.CENTER, 5)
+        lower_lower_box.Add(pasv, 0, wx.ALL | wx.CENTER, 5)
 
-        explorer_sizer.Add(lower_box, 0, wx.ALL | wx.CENTER, 10)
+        explorer_sizer.Add(lower_box, 0, wx.ALL | wx.CENTER, 5)
+        explorer_sizer.Add(lower_lower_box, 0, wx.ALL | wx.CENTER, 5)
 
         vbox.Add(explorer_sizer, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
         self.cwd = cwd
         self.file_list = file_list
         self.upload_button = upload
+        self.download_button = download
+        self.rename_button = rename
+        self.cd_button = cd
+        self.rm_button = rm
         self.refresh_button = refresh
         self.pasv_box = pasv
 
@@ -282,6 +349,7 @@ class Client:
         self.file_list.SetColumnWidth(1, wx.LIST_AUTOSIZE)
         self.file_list.SetColumnWidth(2, wx.LIST_AUTOSIZE)
         self.file_list.SetColumnWidth(3, wx.LIST_AUTOSIZE)
+
 
 class PortValidator(wx.Validator):
     def __init__(self):

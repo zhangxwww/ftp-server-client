@@ -409,15 +409,13 @@ int rest(socket_info_t * sockif, char param[PARAM_LEN]) {
 }
 
 int quit(socket_info_t * sockif, char param[PARAM_LEN]) {
-    if (check_login(sockif) != 0) {
-        return 1;
-    }
     int err = send(sockif->sockfd, "221 Goodbye.\r\n", 14, 0);
     if (err < 0) {
         printf("Error Quit(): %s(%d)\n", strerror(errno), errno);
         return 1;
     }
     sockif->is_login = 0;
+    close(sockif->sockfd);
     return 0;
 }
 
@@ -550,12 +548,12 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
             char * buffer;
             char filename[PATH_LEN];
             char * token_ptr;
-            int count = 0;
-            char info[BUF_SIZE];
-            memset(info, 0, BUF_SIZE);
             for (token_ptr = strtok_r(param, " ", &buffer);
                 token_ptr != NULL;
                 token_ptr = strtok_r(NULL, " ", &buffer)) {
+
+                char info[BUF_SIZE];
+                memset(info, 0, BUF_SIZE);
                 memset(filename, 0, PATH_LEN);
                 strncpy(filename, token_ptr, strlen(token_ptr));
                 filename[strlen(filename)] = '\0';
@@ -563,14 +561,10 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
                 if (err != 0) {
                     break;
                 }
-                ++count;
-            }
-            char res[BUF_SIZE];
-            memset(res, 0, BUF_SIZE);
-            sprintf(res, "total %d\r\n%s", count, info);
-            res[strlen(res)] = '\0';
-            if (send(connfd, res, strlen(res), 0) < 0) {
-                err = 426;
+                if (send(connfd, info, strlen(info), 0) < 0) {
+                    err = 426;
+                    break;
+                }
             }
         }
     }

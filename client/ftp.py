@@ -5,6 +5,8 @@ import re
 
 BUF_SIZE = 8192
 ENCODING = 'latin-1'
+PORT_PORT = 23333
+PORT_HOST = '0.0.0.0'
 SUCCESS_CODE = ['1', '2', '3']
 ERROR_CODE = ['4', '5']
 
@@ -72,7 +74,7 @@ class FTP:
         self.data_sock = None
         return cmd, (res150, res226)
 
-    def STOR(self, filename):
+    def STOR(self, filename, f):
         if self.is_pasv:
             if not self.data_sock:
                 raise FTPError('No data connection')
@@ -82,16 +84,16 @@ class FTP:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
             self.data_listen_sock = None
-        with open(filename, 'wb') as f:
-            while True:
-                block = f.read(BUF_SIZE)
-                if not block:
-                    break
-                self.data_sock.sendall(block)
+        while True:
+            block = f.read(BUF_SIZE)
+            if not block:
+                break
+            self.data_sock.sendall(block)
+        if self.data_sock is not None:
+            self.data_sock.close()
+            self.data_sock = None
         res226 = self.get_response()
         self.is_pasv = None
-        self.data_sock.close()
-        self.data_sock = None
         return cmd, (res150, res226)
 
     def REST(self, rest):
@@ -113,17 +115,16 @@ class FTP:
         return cmd, self.send_command(cmd)
 
     def PORT(self):
-        sock = None
-        for af, socktype, proto, _, saddr in socket.getaddrinfo(None, 0, socket.AF_INET, socket.SOCK_STREAM, 0, socket.AI_PASSIVE):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        host = PORT_HOST
+        port = PORT_PORT
+        while True:
             try:
-                sock = socket.socket(af, socktype, proto)
-                sock.bind(saddr)
-            except OSError:
-                if sock:
-                    sock.close()
-                    sock = None
+                sock.bind((host, port))
+                break
+            except:
+                port += 1
                 continue
-            break
         sock.listen(1)
         host = self.ctrl_sock.getsockname()[0]
         port = sock.getsockname()[1]
@@ -155,6 +156,10 @@ class FTP:
 
     def CWD(self, dir_name):
         cmd = 'CWD {}'.format(dir_name)
+        return cmd, self.send_command(cmd)
+
+    def CDUP(self):
+        cmd = 'CDUP'
         return cmd, self.send_command(cmd)
 
     def PWD(self):
