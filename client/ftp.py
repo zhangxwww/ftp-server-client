@@ -145,7 +145,6 @@ class FTP:
         nums = match.groups()
         host = '.'.join(nums[:4])
         port = int(nums[4]) * 256 + int(nums[5])
-        print(host, port)
         self.data_sock = socket.create_connection((host, port))
         self.is_pasv = True
         return cmd, res

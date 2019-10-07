@@ -1,9 +1,7 @@
 # client.py
 
 import wx
-import wx.lib.masked
-import ctypes
-import sys
+import re
 
 import ftp
 
@@ -57,7 +55,6 @@ class Client:
         self.showPrompt((cmd, res))
         self.refresh(None)
 
-
     def quit(self, _):
         res = self.ftp.QUIT()
         self.showPrompt(res)
@@ -70,15 +67,8 @@ class Client:
         self.showPrompt((cmd, res))
         cmd, res = self.ftp.TYPE('A')
         self.showPrompt((cmd, res))
-        try:
-            cmd, res, lines = self.ftp.LIST(None)
-        except ftp.FTPError as e:
-            self.showPrompt((None, str(e)))
-            return
-        self.showPrompt((cmd, res[0]))
-        self.showPrompt((None, res[1]))
-        # TODO show list
-        print(lines)
+        self.updatePWD()
+        self.updateList()
 
     def upload(self, _):
         print('upload')
@@ -105,11 +95,54 @@ class Client:
             prompt = 'ftp> ' + prompt + cmd + '\n'
         if isinstance(res, tuple) or isinstance(res, list):
             prompt = prompt + ''.join(res)
-            prompt = prompt + '\n'
         if isinstance(res, str):
             prompt = prompt + res
+        if not prompt[-1] == '\n':
             prompt = prompt + '\n'
         self.prompt_show.write(prompt)
+
+    def updatePWD(self):
+        cmd, res = self.ftp.PWD()
+        reg = re.compile(r'["\'](.*?)["\']')
+        match = reg.search(res)
+        wd = match.groups()[0]
+        self.cwd.SetLabelText(wd)
+        self.showPrompt((cmd, res))
+
+    def updateList(self):
+        try:
+            cmd, res, lines = self.ftp.LIST(None)
+        except ftp.FTPError as e:
+            self.showPrompt((None, str(e)))
+            return
+        self.showPrompt((cmd, res[0]))
+        self.showPrompt((None, res[1]))
+        for line in lines:
+            self.showListEachLine(line)
+        self.resizeList()
+
+    def showListEachLine(self, line):
+        line = line.strip()
+        reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*)\s*(.*)$')
+        match = reg.search(line)
+        if not match:
+            return
+        file_type, file_size, last_modified, filename = match.groups()
+        file_size = self.readable_size(int(file_size))
+        self.file_list.Append([file_type, filename, file_size, last_modified])
+
+    @staticmethod
+    def readable_size(file_size):
+        suffixes = ['B', 'KB', 'MB']
+        suf = 'GB'
+        for s in suffixes:
+            if file_size > 1024:
+                file_size = file_size // 1024
+            else:
+                suf = s
+                break
+        return str(file_size) + ' ' + suf
+
 
     def initGUI(self):
         self.main_window = wx.Frame(None, title='FTP Client', size=(640, 976))
@@ -216,14 +249,14 @@ class Client:
         file_list.AppendColumn('Size')
         file_list.AppendColumn('Last modified')
 
-        file_list.Append(["1", "2", "3", "4"])
+
         explorer_sizer.Add(file_list, 0, wx.ALL | wx.CENTER | wx.EXPAND, 10)
 
         lower_box = wx.BoxSizer(wx.HORIZONTAL)
         upload = wx.Button(panel, -1, 'Upload')
         refresh = wx.Button(panel, -1, 'Refresh')
         pasv = wx.CheckBox(panel, -1, 'Pasv')
-        pasv.SetValue(False)
+        pasv.SetValue(True)
 
         lower_box.Add(refresh, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(upload, 0, wx.ALL | wx.CENTER, 5)
@@ -244,6 +277,11 @@ class Client:
         info = wx.StaticText(panel, -1, 'Copyright © Zhang Xinwei 2019')
         vbox.Add(info, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
+    def resizeList(self):
+        self.file_list.SetColumnWidth(0, wx.LIST_AUTOSIZE)
+        self.file_list.SetColumnWidth(1, wx.LIST_AUTOSIZE)
+        self.file_list.SetColumnWidth(2, wx.LIST_AUTOSIZE)
+        self.file_list.SetColumnWidth(3, wx.LIST_AUTOSIZE)
 
 class PortValidator(wx.Validator):
     def __init__(self):
@@ -277,17 +315,6 @@ class PortValidator(wx.Validator):
                 return True
         return False
 
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
 
 if __name__ == '__main__':
     Client()
-    '''
-    if is_admin():
-        Client()
-    else:
-        ctypes.windll.shell32.ShellExecuteW(None, 'runas', sys.executable, __file__, None, 1)
-    '''
