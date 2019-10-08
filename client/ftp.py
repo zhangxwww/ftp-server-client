@@ -10,14 +10,15 @@ PORT_HOST = '0.0.0.0'
 SUCCESS_CODE = ['1', '2', '3']
 ERROR_CODE = ['4', '5']
 
-
-class FTPError(Exception):
-    def __init__(self, info):
-        self.info = info
-
-    def __str__(self):
-        return str(self.info)
-
+def catchError(error):
+    def catchErrorDecorator(f):
+        def g(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except error as e:
+                return None, str(e)
+        return g
+    return catchErrorDecorator
 
 class FTP:
     def __init__(self):
@@ -29,6 +30,7 @@ class FTP:
         self.is_pasv = None
         self.file = None
 
+    @catchError(IOError)
     def connect(self, host, port):
         self.ctrl_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         self.ctrl_sock.connect((host, port))
@@ -36,6 +38,7 @@ class FTP:
         res = self.get_response()
         return None, res
 
+    @catchError(IOError)
     def exit(self):
         if self.file is not None:
             self.file.close()
@@ -44,18 +47,21 @@ class FTP:
             self.ctrl_sock.close()
             self.ctrl_sock = None
 
+    @catchError(IOError)
     def USER(self, username):
         cmd = 'USER {}'.format(username)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def PASS(self, password):
         cmd = 'PASS {}'.format(password)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def RETR(self, filename):
         if self.is_pasv:
             if not self.data_sock:
-                raise FTPError('No data connection')
+                return None, 'No data connection'
         cmd = 'RETR {}'.format(filename)
         res150 = self.send_command(cmd)
         if not self.is_pasv:
@@ -74,10 +80,11 @@ class FTP:
         self.data_sock = None
         return cmd, (res150, res226)
 
+    @catchError(IOError)
     def STOR(self, filename, f):
         if self.is_pasv:
             if not self.data_sock:
-                raise FTPError('No data connection')
+                return None, 'No data connection'
         cmd = 'STOR {}'.format(filename)
         res150 = self.send_command(cmd)
         if not self.is_pasv:
@@ -96,24 +103,29 @@ class FTP:
         self.is_pasv = None
         return cmd, (res150, res226)
 
+    @catchError(IOError)
     def REST(self, rest):
         cmd = 'REST {}'.format(rest)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def QUIT(self):
         cmd = 'QUIT'
         res = self.send_command(cmd)
         self.exit()
         return cmd, res
 
+    @catchError(IOError)
     def SYST(self):
         cmd = 'SYST'
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def TYPE(self, t):
         cmd = 'TYPE {}'.format(t)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def PORT(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         host = PORT_HOST
@@ -136,13 +148,14 @@ class FTP:
         self.data_listen_sock = sock
         return cmd, res
 
+    @catchError(IOError)
     def PASV(self):
         cmd = 'PASV'
         res = self.send_command(cmd)
         reg = re.compile(r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)')
         match = reg.search(res)
         if not match:
-            raise FTPError('Invalid response: {}'.format(res))
+            return None, 'Invalid response: {}'.format(res)
         nums = match.groups()
         host = '.'.join(nums[:4])
         port = int(nums[4]) * 256 + int(nums[5])
@@ -150,26 +163,31 @@ class FTP:
         self.is_pasv = True
         return cmd, res
 
+    @catchError(IOError)
     def MKD(self, dir_name):
         cmd = 'MKD {}'.format(dir_name)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def CWD(self, dir_name):
         cmd = 'CWD {}'.format(dir_name)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def CDUP(self):
         cmd = 'CDUP'
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def PWD(self):
         cmd = 'PWD'
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def LIST(self, name):
         if self.is_pasv:
             if not self.data_sock:
-                raise FTPError('No data connection')
+                return None, 'No data connection'
         cmd = 'LIST'
         if isinstance(name, list) or isinstance(name, tuple):
             cmd = cmd + ' '.join(name)
@@ -197,14 +215,17 @@ class FTP:
         self.data_sock = None
         return cmd, (res150, res226), lines
 
+    @catchError(IOError)
     def RMD(self, dir_name):
-        cmd = 'RWD {}'.format(dir_name)
+        cmd = 'RMD {}'.format(dir_name)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def RNFR(self, old_name):
         cmd = 'RNFR {}'.format(old_name)
         return cmd, self.send_command(cmd)
 
+    @catchError(IOError)
     def RNTO(self, new_name):
         cmd = 'RNTO {}'.format(new_name)
         return cmd, self.send_command(cmd)
@@ -223,8 +244,6 @@ class FTP:
                 if nextline[:3] == code:
                     if nextline[3:4] == ' ':
                         break
-                else:
-                    raise FTPError('Wrong response format')
         return line
 
     def parse_single_line(self):

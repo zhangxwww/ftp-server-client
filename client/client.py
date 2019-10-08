@@ -31,6 +31,7 @@ class Client:
         self.download_button = None
 
         self.files = []
+        self.selected_row = None
 
         self.ftp = ftp.FTP()
         self.app = wx.App()
@@ -44,8 +45,10 @@ class Client:
         try:
             port = int(port)
             if port > 65535:
+                self.showPrompt((None, 'Invalid port'))
                 return
         except ValueError:
+            self.showPrompt((None, 'Invalid port'))
             return
         res = self.ftp.connect(host, port)
         self.showPrompt(res)
@@ -57,7 +60,7 @@ class Client:
         self.showPrompt((cmd, res))
         if res[0] == '3':
             cmd, res = self.ftp.PASS(password)
-            self.showPrompt((cmd, res))
+        self.showPrompt((cmd, res))
         cmd, res = self.ftp.SYST()
         self.showPrompt((cmd, res))
         self.refresh(None)
@@ -89,21 +92,42 @@ class Client:
         self.showPrompt((None, res[1]))
         self.updateList()
 
-    def changeDir(self, dir_name):
-        print('change {}'.format(dir_name))
+    def changeDir(self, _):
+        dir_name = self.selected_row[1]
+        if dir_name == '..':
+            cmd, res = self.ftp.CDUP()
+        else:
+            cmd, res = self.ftp.CWD(dir_name)
+        self.showPrompt((cmd, res))
+        self.refresh(None)
 
-    def removeDir(self, dir_name):
-        print('remove {}'.format(dir_name))
+    def removeDir(self, _):
+        dir_name = self.selected_row[1]
+        cmd, res = self.ftp.RMD(dir_name)
+        self.showPrompt((cmd, res))
+        self.refresh(None)
 
-    def download(self, filename):
+    def download(self, _):
+        filename = self.selected_row[1]
         print('download {}'.format(filename))
 
-    def rename(self, old, new):
+    def rename(self, _):
+        old = self.selected_row[1]
+        rename_dialog = wx.TextEntryDialog(None, 'Please enter the new name', 'Title', 'Default text')
+        if rename_dialog.ShowModal() != wx.ID_OK:
+            return
+        new = rename_dialog.GetValue()
         print('rename {} to {}'.format(old, new))
+        cmd, res = self.ftp.RNFR(old)
+        self.showPrompt((cmd, res))
+        if res[0] != '3':
+            self.showPrompt((cmd, 'Invalid response, fail to rename'))
+        cmd, res = self.ftp.RNTO(new)
+        self.showPrompt((cmd, res))
+        self.refresh(None)
 
     def leftClickItem(self, event):
         row = self.files[event.GetIndex()]
-        print(row)
         if row[0] == 'd':
             self.cd_button.Enable()
             self.rm_button.Enable()
@@ -114,6 +138,7 @@ class Client:
             self.download_button.Enable()
             self.cd_button.Disable()
             self.rm_button.Disable()
+        self.selected_row = row
 
     def showPrompt(self, line):
         prompt = ''
@@ -144,11 +169,7 @@ class Client:
         self.showPrompt((cmd, res))
         cmd, res = self.ftp.TYPE('A')
         self.showPrompt((cmd, res))
-        try:
-            cmd, res, lines = self.ftp.LIST(None)
-        except ftp.FTPError as e:
-            self.showPrompt((None, str(e)))
-            return
+        cmd, res, lines = self.ftp.LIST(None)
         self.showPrompt((cmd, res[0]))
         self.showPrompt((None, res[1]))
         parsed = []
@@ -213,6 +234,10 @@ class Client:
         self.quit_button.Bind(wx.EVT_BUTTON, self.quit)
         self.refresh_button.Bind(wx.EVT_BUTTON, self.refresh)
         self.upload_button.Bind(wx.EVT_BUTTON, self.upload)
+        self.cd_button.Bind(wx.EVT_BUTTON, self.changeDir)
+        self.rm_button.Bind(wx.EVT_BUTTON, self.removeDir)
+        self.download_button.Bind(wx.EVT_BUTTON, self.download)
+        self.rename_button.Bind(wx.EVT_BUTTON, self.rename)
         self.file_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.leftClickItem)
 
     def initConnectionArea(self, panel, vbox):
@@ -339,16 +364,18 @@ class Client:
         self.refresh_button = refresh
         self.pasv_box = pasv
 
+        self.resizeList()
+
     @staticmethod
     def initBottom(panel, vbox):
         info = wx.StaticText(panel, -1, 'Copyright © Zhang Xinwei 2019')
         vbox.Add(info, 0, wx.ALL | wx.CENTER | wx.EXPAND, 5)
 
     def resizeList(self):
-        self.file_list.SetColumnWidth(0, wx.LIST_AUTOSIZE)
-        self.file_list.SetColumnWidth(1, wx.LIST_AUTOSIZE)
-        self.file_list.SetColumnWidth(2, wx.LIST_AUTOSIZE)
-        self.file_list.SetColumnWidth(3, wx.LIST_AUTOSIZE)
+        self.file_list.SetColumnWidth(0, 40)
+        self.file_list.SetColumnWidth(1, 250)
+        self.file_list.SetColumnWidth(2, 150)
+        self.file_list.SetColumnWidth(3, 150)
 
 
 class PortValidator(wx.Validator):
