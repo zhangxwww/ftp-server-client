@@ -58,7 +58,7 @@ class FTP:
         return cmd, self.send_command(cmd)
 
     @catchError(IOError)
-    def RETR(self, filename):
+    def RETR(self, filename, f):
         if self.is_pasv:
             if not self.data_sock:
                 return None, 'No data connection'
@@ -68,12 +68,13 @@ class FTP:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
             self.data_listen_sock = None
-        with open(filename, 'wb') as f:
-            while True:
-                data = self.data_sock.recv(BUF_SIZE)
-                if not data:
-                    break
-                f.write(data)
+        if res150[:1] in ['4', '5']:
+            return cmd, res150
+        while True:
+            data = self.data_sock.recv(BUF_SIZE)
+            if not data:
+                break
+            f.write(data)
         res226 = self.get_response()
         self.is_pasv = None
         self.data_sock.close()
@@ -91,6 +92,8 @@ class FTP:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
             self.data_listen_sock = None
+        if res150[:1] in ['4', '5']:
+            return cmd, res150
         while True:
             block = f.read(BUF_SIZE)
             if not block:
