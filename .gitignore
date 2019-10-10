@@ -4,8 +4,15 @@
 
 makefile
 *.o
+*.exe
 test*
 auto*
+
+dist
+build
+*.spec
+
+client/readme.md
 
 *.ipynb
 

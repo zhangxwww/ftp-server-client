@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "defination.h"
+#include "definition.h"
 
 handler_t get_cmd_handler(char cmd[5], int * len);
 

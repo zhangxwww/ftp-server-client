@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "defination.h"
+#include "definition.h"
 #include "utils.h"
 #include "errors.h"
 #include "handlers.h"

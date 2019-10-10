@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "defination.h"
+#include "definition.h"
 
 void error425(socket_info_t * sockif, char errinfo[ERROR_LEN]);
 void error426(socket_info_t * sockif, char errinfo[ERROR_LEN]);

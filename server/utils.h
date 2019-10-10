@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "defination.h"
+#include "definition.h"
 
 // 解析命令行参数
 void parseArgs(int argc, char** argv);

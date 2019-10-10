@@ -19,7 +19,7 @@
 #include <stdlib.h>
 
 #include "handlers.h"
-#include "defination.h"
+#include "definition.h"
 #include "errors.h"
 #include "utils.h"
 
