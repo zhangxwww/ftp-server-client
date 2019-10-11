@@ -162,7 +162,7 @@ int build_data_connect(socket_info_t * sockif, int * connfd) {
     res[strlen(res)] = '\0';
     err = send(sockif->sockfd, res, strlen(res), 0);
     if (err < 0) {
-        printf("Error Send 150 for RETR: %s(%d)\n", strerror(errno), errno);
+        printf("Error Send 150: %s(%d)\n", strerror(errno), errno);
         return 1;
     }
 

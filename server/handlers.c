@@ -337,6 +337,7 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
             if (len != fwrite(block, 1, len, file)) {
                 printf("Error occurs when reciving file\n");
                 error426(sockif, NULL);
+                break;
             }
         }
     }

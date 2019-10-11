@@ -59,6 +59,7 @@ int main(int argc, char **argv) {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(listen_port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);	//监听"0.0.0.0"
+
     //将本机的ip和port与socket绑定
     if (bind(listenfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         printf("Error bind(): %s(%d)\n", strerror(errno), errno);
