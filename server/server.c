@@ -100,7 +100,7 @@ void process_func(socket_info_t * sockif) {
         err = recv(socket_info->sockfd, req, BUF_SIZE, 0);
         if (err < 0) {
             printf("Error listening: %s(%d)\n", strerror(errno), errno);
-            exit_process(socket_info);
+            break;
         }
         if (err == 0) {
             quit(sockif, NULL);

@@ -10,6 +10,7 @@ import ftp
 class Client:
     def __init__(self):
 
+        # ??????
         self.main_window = None
         self.ip_input = None
         self.port_input = None
@@ -81,6 +82,7 @@ class Client:
         self.download_button.Disable()
         self.rename_button.Disable()
 
+    # ???????????
     def refresh(self, _):
         self.updatePWD()
         self.updateList()
@@ -168,6 +170,7 @@ class Client:
         self.showPrompt((cmd, res))
         self.refresh(None)
 
+    # ???????????
     def leftClickItem(self, event):
         row = self.files[event.GetIndex()]
         if row[0] == 'd':
@@ -182,6 +185,7 @@ class Client:
             self.rm_button.Disable()
         self.selected_row = row
 
+    # ????????
     def execUserCmd(self, _):
         cmd = self.prompt_input.GetValue()
         self.prompt_input.Clear()
@@ -191,6 +195,7 @@ class Client:
             res = str(e)
         self.showPrompt((cmd, res))
 
+    # ?Prompt????req?res
     def showPrompt(self, line):
         prompt = ''
         cmd, res = line
@@ -243,6 +248,7 @@ class Client:
         self.files = parsed
         self.resizeList()
 
+    # ??LIST????????
     def parseListEachLine(self, line):
         line = line.strip()
         reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*)\s*(.*)$')
@@ -253,6 +259,7 @@ class Client:
         file_size = self.readable_size(int(file_size))
         return file_type, filename, file_size, last_modified
 
+    # ?????????
     @staticmethod
     def readable_size(file_size):
         suffixes = ['B', 'KB', 'MB']
@@ -264,6 +271,8 @@ class Client:
                 suf = s
                 break
         return str(file_size) + ' ' + suf
+
+    ########################### ??????GUI?????? ############################
 
     def initGUI(self):
         self.main_window = wx.Frame(None, title='FTP Client', size=(640, 768))
@@ -433,7 +442,7 @@ class Client:
         self.file_list.SetColumnWidth(2, 150)
         self.file_list.SetColumnWidth(3, 150)
 
-
+# ??????????
 class PortValidator(wx.Validator):
     def __init__(self):
         wx.Validator.__init__(self)

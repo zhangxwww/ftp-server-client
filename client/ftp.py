@@ -7,8 +7,6 @@ BUF_SIZE = 8192
 ENCODING = 'latin-1'
 PORT_PORT = 23333
 PORT_HOST = '0.0.0.0'
-SUCCESS_CODE = ['1', '2', '3']
-ERROR_CODE = ['4', '5']
 
 def catchError(error):
     def catchErrorDecorator(f):
@@ -233,10 +231,12 @@ class FTP:
         cmd = 'RNTO {}'.format(new_name)
         return cmd, self.send_command(cmd)
 
+    # 发送指令并返回response
     def send_command(self, cmd):
         self.send_request(cmd)
         return self.get_response()
 
+    # 获取多行response
     def get_response(self):
         line = self.parse_single_line()
         if line[3:4] == '-':
@@ -249,6 +249,7 @@ class FTP:
                         break
         return line
 
+    # 接受一行response并取出换行符
     def parse_single_line(self):
         line = self.file.readline(BUF_SIZE + 1)
         if not line:

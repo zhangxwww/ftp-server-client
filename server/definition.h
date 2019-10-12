@@ -40,8 +40,10 @@ typedef struct {
     struct sockaddr_in port_addr;
 } socket_info_t;
 
+// 处理不同指令的函数指针类型
 typedef int (*handler_t) (socket_info_t *, char [PARAM_LEN]);
 
+// 指令名，函数指针，与指令长度
 typedef struct {
     char name[5];
     handler_t handler;

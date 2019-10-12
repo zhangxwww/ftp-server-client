@@ -156,6 +156,7 @@ int pasv(socket_info_t * sockif, char param[PARAM_LEN]) {
     pasv_addr.sin_port = htons(data_port);
     pasv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
+    // PASV_PORT 开始尝试之后的每一个端口，直到没有被占用
     while ((bind(sockif->datafd, (struct sockaddr *)&pasv_addr, sizeof(pasv_addr))) == -1) {
         ++data_port;
         if (data_port < 1024) {
@@ -259,6 +260,7 @@ int retr(socket_info_t * sockif, char param[PARAM_LEN]) {
     }
     char block[BUF_SIZE];
     memset(block, 0, BUF_SIZE);
+    // 断点续传需要从rest位置开始
     err = fseek(file, sockif->rest, SEEK_SET);
     if (err != 0) {
         printf("Error fseek() fail\n");
@@ -309,10 +311,10 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
     filename[strlen(param)] = '\0';
 
     FILE * file;
-    if (sockif->rest == 0) {
+    if (sockif->rest == 0) { // 不需要断点续传
         file = fopen(filename, "wb");
     }
-    else {
+    else {                  // 断点续传
         file = fopen(filename, "rb+");
     }
     if (file == NULL) {
@@ -378,7 +380,7 @@ int type(socket_info_t * sockif, char param[PARAM_LEN]) {
         }
         return 0;
     }
-    else if (strncmp(param, "A", 1) == 0) {
+    else if (strncmp(param, "A", 1) == 0) { // 有些客户端会在LIST前发TYPE A指令，这里没有做任何处理
         err = send(sockif->sockfd, "200 Type set to A.\r\n", 20, 0);
         if (err < 0) {
             printf("Error TYPE(): %s(%d)\n", strerror(errno), errno);
@@ -533,7 +535,7 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
         error425(sockif, NULL);
         return 1;
     }
-    if (param == NULL) {
+    if (param == NULL) { // LIST后没有参数，显示当前目录
         char cur[PATH_LEN];
         memset(cur, 0, PATH_LEN);
         getcwd(cur, PATH_LEN);
@@ -542,10 +544,10 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
     else {
         struct stat st;
         stat(param, &st);
-        if ((st.st_mode & S_IFMT) == S_IFDIR) {
+        if ((st.st_mode & S_IFMT) == S_IFDIR) { // LIST SOME_DIR
             err = traverse_dir(param, connfd);
         }
-        else {
+        else {                                  // LIST file1 file2 file3 ...
             char * buffer;
             char filename[PATH_LEN];
             char * token_ptr;
