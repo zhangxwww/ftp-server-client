@@ -26,33 +26,52 @@ extern ushort listen_port;
 extern char root[PATH_LEN];
 extern char ip_addr[16];
 
-void parseArgs(int argc, char** argv) {
-    int i;
-    for (i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "-port") == 0) {
-            ++i;
-            if (i == argc) {
-                break;
+int parseArgs(int argc, char** argv) {
+    memset(root, 0, PATH_LEN);
+    if (argc == 1) {
+        listen_port = 21;
+        strncpy(root, "/tmp", 4);
+        root[strlen(root)] = '\0';
+        return 0;
+    }
+    else if (argc == 3) {
+        if (strcmp(argv[1], "-port") == 0) {
+            listen_port = (ushort) atoi(argv[2]);
+            if (listen_port == 0) {
+                return -1;
             }
-            if (strcmp(argv[i], "-root") == 0) {
-                continue;
-            }
-            listen_port = (ushort) atoi(argv[i]);
-            if (listen_port < 1024) {
-                listen_port = 21;
-            }
+            strncpy(root, "/tmp", 4);
+            root[strlen(root)] = '\0';
+            return 0;
         }
-        else if (strcmp(argv[i], "-root") == 0) {
-            ++i;
-            if (i == argc) {
-                break;
-            }
-            if (strcmp(argv[i], "-port") == 0) {
-                continue;
-            }
-            strncpy(root, argv[i], PATH_LEN);
+        else if (strcmp(argv[1], "-root") == 0) {
+            strncpy(root, argv[2], strlen(argv[2]));
+            root[strlen(root)] = '\0';
+            listen_port = 21;
+            return 0;
         }
     }
+    else if (argc == 5) {
+        if (strcmp(argv[1], "-port") == 0 && strcmp(argv[3], "-root") == 0) {
+            listen_port = (ushort) atoi(argv[2]);
+            if (listen_port == 0) {
+                return -1;
+            }
+            strncpy(root, argv[4], strlen(argv[4]));
+            root[strlen(root)] = '\0';
+            return 0;
+        }
+        else if (strcmp(argv[3], "-port") == 0 && strcmp(argv[1], "-root") == 0) {
+            listen_port = (ushort) atoi(argv[4]);
+            if (listen_port == 0) {
+                return -1;
+            }
+            strncpy(root, argv[2], strlen(argv[2]));
+            root[strlen(root)] = '\0';
+            return 0;
+        }
+    }
+    return -1;
 }
 
 socket_info_t * new_socket_info(int sfd) {

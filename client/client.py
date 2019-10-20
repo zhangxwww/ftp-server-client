@@ -251,11 +251,11 @@ class Client:
     # ??LIST????????
     def parseListEachLine(self, line):
         line = line.strip()
-        reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*)\s*(.*)$')
+        reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*(:\d*)?)\s*(.*)$')
         match = reg.search(line)
         if not match:
             return
-        file_type, file_size, last_modified, filename = match.groups()
+        file_type, file_size, last_modified, _, filename = match.groups()
         file_size = self.readable_size(int(file_size))
         return file_type, filename, file_size, last_modified
 

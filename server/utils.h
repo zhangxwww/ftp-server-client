@@ -24,7 +24,7 @@
 #include "definition.h"
 
 // 解析命令行参数
-void parseArgs(int argc, char** argv);
+int parseArgs(int argc, char** argv);
 
 // 生成新的连接信息
 socket_info_t * new_socket_info(int sfd);

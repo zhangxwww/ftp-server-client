@@ -40,9 +40,12 @@ int main(int argc, char **argv) {
     int listenfd;		//监听socket和连接socket不一样，后者用于数据传输
     struct sockaddr_in addr;
 
-    listen_port = 21;
-    strcpy(root, "/tmp");
-    parseArgs(argc, argv);
+    //listen_port = 21;
+    //strcpy(root, "/tmp");
+    if (parseArgs(argc, argv) != 0) {
+        printf("Invalid arguments\n");
+        return 0;
+    }
     printf("port: %hu\n", listen_port);
     printf("root: %s\n", root);
     if (chdir(root) != 0) {
