@@ -3,6 +3,7 @@
 import wx
 import re
 import os
+import _thread
 
 import ftp
 
@@ -35,6 +36,7 @@ class Client:
         self.files = []
         self.selected_row = None
         self.connected = False
+        self.trans_lock = False
 
         self.ftp = ftp.FTP()
         self.app = wx.App()
@@ -74,8 +76,6 @@ class Client:
         self.connected = True
         cmd, res = self.ftp.SYST()
         self.showPrompt((cmd, res))
-        if res[0] != '2':
-            return
         self.refresh(None)
 
     def quit(self, _):
@@ -119,15 +119,20 @@ class Client:
         self.showPrompt((cmd, res))
         if res[0] != '2':
             return
-        cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
-        if isinstance(res, str):
-            self.showPrompt((cmd, res))
-        elif isinstance(res, tuple):
-            self.showPrompt((cmd, res[0]))
-            self.showPrompt((None, res[1]))
-        if res[0] != '2':
-            return
-        self.updateList()
+
+        @self.requireLock()
+        def thread_func(filename, path):
+            cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
+            if isinstance(res, str):
+                self.showPrompt((cmd, res))
+            elif isinstance(res, tuple):
+                self.showPrompt((cmd, res[0]))
+                self.showPrompt((None, res[1]))
+            if res[0] != '2':
+                return
+            self.updateList()
+
+        _thread.start_new_thread(thread_func, (filename, path))
 
     def changeDir(self, _):
         dir_name = self.selected_row[1]
@@ -179,12 +184,17 @@ class Client:
         self.showPrompt((cmd, res))
         if res[0] != '2':
             return
-        cmd, res = self.ftp.RETR(filename, open(path, 'wb'))
-        if isinstance(res, str):
-            self.showPrompt((cmd, res))
-        elif isinstance(res, tuple):
-            self.showPrompt((cmd, res[0]))
-            self.showPrompt((None, res[1]))
+
+        @self.requireLock()
+        def thread_func(filename, path):
+            cmd, res = self.ftp.RETR(filename, open(path, 'wb'))
+            if isinstance(res, str):
+                self.showPrompt((cmd, res))
+            elif isinstance(res, tuple):
+                self.showPrompt((cmd, res[0]))
+                self.showPrompt((None, res[1]))
+
+        _thread.start_new_thread(thread_func, (filename, path))
 
     def rename(self, _):
         old = self.selected_row[1]
@@ -198,6 +208,8 @@ class Client:
             self.showPrompt((cmd, 'Invalid response, fail to rename'))
         cmd, res = self.ftp.RNTO(new)
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         self.refresh(None)
 
     # ???????????
@@ -255,30 +267,50 @@ class Client:
         else:
             cmd, res = self.ftp.PORT()
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         cmd, res = self.ftp.TYPE('A')
         self.showPrompt((cmd, res))
-        cmd, res, lines = self.ftp.LIST(None)
-        self.showPrompt((cmd, res[0]))
-        self.showPrompt((None, res[1]))
-        parsed = []
-        for line in lines:
-            p = self.parseListEachLine(line)
-            if p:
-                parsed.append(p)
-        parsed = sorted(parsed, key=lambda x: x[1])
-        if len(parsed) > 0 and parsed[0][1][:1] != '.':
-            parsed.insert(0, ('d', '.', '', ''))
-        if len(parsed) > 1 and parsed[1][1][:2] != '..':
-            parsed.insert(1, ('d', '..', '', ''))
-        self.file_list.ClearAll()
-        self.file_list.AppendColumn('Type')
-        self.file_list.AppendColumn('Filename')
-        self.file_list.AppendColumn('Size')
-        self.file_list.AppendColumn('Last modified')
-        for p in parsed:
-            self.file_list.Append(p)
-        self.files = parsed
-        self.resizeList()
+
+        @self.requireLock()
+        def thread_func():
+            cmd, res, lines = self.ftp.LIST(None)
+            self.showPrompt((cmd, res[0]))
+            self.showPrompt((None, res[1]))
+            if res[1][0] != '2':
+                return
+            parsed = []
+            for line in lines:
+                p = self.parseListEachLine(line)
+                if p:
+                    parsed.append(p)
+            parsed = sorted(parsed, key=lambda x: x[1])
+            if len(parsed) > 0 and parsed[0][1][:1] != '.':
+                parsed.insert(0, ('d', '.', '', ''))
+            if len(parsed) > 1 and parsed[1][1][:2] != '..':
+                parsed.insert(1, ('d', '..', '', ''))
+            self.file_list.ClearAll()
+            self.file_list.AppendColumn('Type')
+            self.file_list.AppendColumn('Filename')
+            self.file_list.AppendColumn('Size')
+            self.file_list.AppendColumn('Last modified')
+            for p in parsed:
+                self.file_list.Append(p)
+            self.files = parsed
+            self.resizeList()
+
+        _thread.start_new_thread(thread_func, ())
+
+    def requireLock(self):
+        def requireLockDec(f):
+            def g(*args, **kwargs):
+                if self.trans_lock:
+                    return
+                self.trans_lock = True
+                f(*args, **kwargs)
+                self.trans_lock = False
+            return g
+        return requireLockDec
 
     # ??LIST????????
     def parseListEachLine(self, line):
