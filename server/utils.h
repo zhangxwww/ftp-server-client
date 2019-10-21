@@ -26,6 +26,9 @@
 // 解析命令行参数
 int parseArgs(int argc, char** argv);
 
+// 检查邮箱合法性
+int check_email(char email[PARAM_LEN]);
+
 // 生成新的连接信息
 socket_info_t * new_socket_info(int sfd);
 

@@ -34,6 +34,7 @@ class Client:
 
         self.files = []
         self.selected_row = None
+        self.connected = False
 
         self.ftp = ftp.FTP()
         self.app = wx.App()
@@ -54,22 +55,35 @@ class Client:
             return
         res = self.ftp.connect(host, port)
         self.showPrompt(res)
+        self.connected = True
 
     def login(self, _):
+        if not self.connected:
+            self.showPrompt((None, "Please connect to server"))
+            return
         username = self.username_input.GetValue()
         password = self.password_input.GetValue()
         cmd, res = self.ftp.USER(username)
         self.showPrompt((cmd, res))
-        if res[0] == '3':
-            cmd, res = self.ftp.PASS(password)
+        if res[0] != '3':
+            return
+        cmd, res = self.ftp.PASS(password)
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
+        self.connected = True
         cmd, res = self.ftp.SYST()
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         self.refresh(None)
 
     def quit(self, _):
+        if not self.connected:
+            return
         res = self.ftp.QUIT()
         self.showPrompt(res)
+        self.connected = False
         self.file_list.ClearAll()
         self.file_list.AppendColumn('Type')
         self.file_list.AppendColumn('Filename')
@@ -94,19 +108,25 @@ class Client:
             return
         path = file_dialog.GetPath()
         filename = path.split(os.sep)[-1]
-        res = self.ftp.TYPE('I')
-        self.showPrompt(res)
+        cmd, res = self.ftp.TYPE('I')
+        self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         if self.pasv_box.GetValue():
             cmd, res = self.ftp.PASV()
         else:
             cmd, res = self.ftp.PORT()
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
         if isinstance(res, str):
             self.showPrompt((cmd, res))
         elif isinstance(res, tuple):
             self.showPrompt((cmd, res[0]))
             self.showPrompt((None, res[1]))
+        if res[0] != '2':
+            return
         self.updateList()
 
     def changeDir(self, _):
@@ -116,12 +136,16 @@ class Client:
         else:
             cmd, res = self.ftp.CWD(dir_name)
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         self.refresh(None)
 
     def removeDir(self, _):
         dir_name = self.selected_row[1]
         cmd, res = self.ftp.RMD(dir_name)
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         self.refresh(None)
 
     def makeDir(self, _):
@@ -131,6 +155,8 @@ class Client:
         dir_name = make_dialog.GetValue()
         cmd, res = self.ftp.MKD(dir_name)
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         self.refresh(None)
 
     def download(self, _):
@@ -144,11 +170,15 @@ class Client:
         filename = self.selected_row[1]
         cmd, res = self.ftp.TYPE('I')
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         if self.pasv_box.GetValue():
             cmd, res = self.ftp.PASV()
         else:
             cmd, res = self.ftp.PORT()
         self.showPrompt((cmd, res))
+        if res[0] != '2':
+            return
         cmd, res = self.ftp.RETR(filename, open(path, 'wb'))
         if isinstance(res, str):
             self.showPrompt((cmd, res))
@@ -213,6 +243,8 @@ class Client:
         cmd, res = self.ftp.PWD()
         reg = re.compile(r'["\'](.*?)["\']')
         match = reg.search(res)
+        if match is None:
+            return
         wd = match.groups()[0]
         self.cwd.SetLabelText(wd)
         self.showPrompt((cmd, res))

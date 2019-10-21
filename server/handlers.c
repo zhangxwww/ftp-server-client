@@ -25,7 +25,7 @@
 
 cmd_info_t cmd_table[] = {
     { "USER", &user,   4 },
-    { "PASV", &pasv,  -1 },
+    { "PASV", &pasv,   4 },
     { "PORT", &port,   4 },
     { "RETR", &retr,   4 },
     { "STOR", &stor,   4 },
@@ -119,6 +119,7 @@ int pass(socket_info_t * sockif) {
     int err;
     memset(req, 0, BUF_SIZE);
     recv(fd, req, BUF_SIZE, 0);
+    trim_req(req, strlen(req));
     if (strncmp(req, "PASS", 4) != 0) {
         printf("Invalid command: 'PASS' expected\n");
         error503(sockif, "'PASS' expected");
@@ -126,6 +127,15 @@ int pass(socket_info_t * sockif) {
     }
     if (strlen(req) < 5) {
         error500(sockif, NULL);
+        return 1;
+    }
+    char param[PARAM_LEN];
+    memset(param, 0, PARAM_LEN);
+    strcpy(param, req + 5);
+    param[strlen(param)] = '\0';
+    if (check_email(param) != 0) {
+        // Wrong email format
+        error501(sockif, "Wrong email format");
         return 1;
     }
     memset(res, 0, BUF_SIZE);

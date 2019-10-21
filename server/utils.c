@@ -74,6 +74,51 @@ int parseArgs(int argc, char** argv) {
     return -1;
 }
 
+int valid_email_char(char c) {
+    return (c >= 'a' && c <= 'z')
+        || (c >= 'A' && c <= 'Z')
+        || (c >= '0' && c <= '9')
+        || c == '_';
+}
+
+int check_email(char email[PARAM_LEN]) {
+    int len = strlen(email);
+    int i;
+    int found_at = 0;
+    for (i = 0; i < len; ++i) {
+        if (email[i] == '@') {
+            // '@' or more than 1 '@'
+            if (found_at != 0) {
+                printf("1\n");
+                return -1;
+            }
+            found_at = 1;
+        }
+        else if (email[i] == '.') {
+            // Starts/ends with '.'
+            if (i == 0 || i == len -1) {
+                printf("2\n");
+                return -1;
+            }
+            // Continuing '.'
+            else if (i > 0 || email[i - 1] == '.') {
+                printf("3\n");
+                return -1;
+            }
+        }
+        else if (!valid_email_char(email[i])) {
+            printf("4\n");
+            return -1;
+        }
+    }
+    if (found_at != 1) {
+        // Can't find '@'
+        printf("5\n");
+        return -1;
+    }
+    return 0;
+}
+
 socket_info_t * new_socket_info(int sfd) {
     socket_info_t * info;
     info = malloc(sizeof(* info));
@@ -339,7 +384,7 @@ int generate_file_info(char filename[PATH_LEN], char info[BUF_SIZE]) {
     mtime[strlen(mtime)] = '\0';
     char tmp[BUF_SIZE];
     memset(tmp, 0, BUF_SIZE);
-    sprintf(tmp, "%s   %d %s     %s    %d %s %s\r\n", permission, links, user, group, size, mtime, filename);
+    sprintf(tmp, "%s %d %s %s %13d %s %s\r\n", permission, links, user, group, size, mtime, filename);
     tmp[strlen(tmp)] = '\0';
     strcat(info, tmp);
     return 0;

@@ -4,7 +4,6 @@ import socket
 import re
 
 BUF_SIZE = 8192
-ENCODING = 'latin-1'
 PORT_PORT = 23333
 PORT_HOST = '0.0.0.0'
 
@@ -32,7 +31,7 @@ class FTP:
     def connect(self, host, port):
         self.ctrl_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         self.ctrl_sock.connect((host, port))
-        self.file = self.ctrl_sock.makefile('r', encoding=ENCODING)
+        self.file = self.ctrl_sock.makefile('r')
         res = self.get_response()
         return None, res
 
@@ -200,7 +199,7 @@ class FTP:
             self.data_listen_sock.close()
             self.data_listen_sock = None
         lines = []
-        with self.data_sock.makefile('r', encoding=ENCODING) as f:
+        with self.data_sock.makefile('r', encoding='UTF-8') as f:
             while True:
                 line = f.readline(BUF_SIZE)
                 if not line:
@@ -262,4 +261,4 @@ class FTP:
 
     def send_request(self, req):
         req = req.strip() + '\r\n'
-        self.ctrl_sock.sendall(req.encode(ENCODING))
+        self.ctrl_sock.sendall(req.encode())
