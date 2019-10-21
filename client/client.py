@@ -122,12 +122,14 @@ class Client:
 
         @self.requireLock()
         def thread_func(filename, path):
+            self.main_window.SetTitle('FTP Client Uploading...')
             cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
             if isinstance(res, str):
                 self.showPrompt((cmd, res))
             elif isinstance(res, tuple):
                 self.showPrompt((cmd, res[0]))
                 self.showPrompt((None, res[1]))
+            self.main_window.SetTitle('FTP Client')
             if res[0] != '2':
                 return
             self.updateList()
@@ -187,12 +189,14 @@ class Client:
 
         @self.requireLock()
         def thread_func(filename, path):
+            self.main_window.SetTitle('FTP Client Downloading...')
             cmd, res = self.ftp.RETR(filename, open(path, 'wb'))
             if isinstance(res, str):
                 self.showPrompt((cmd, res))
             elif isinstance(res, tuple):
                 self.showPrompt((cmd, res[0]))
                 self.showPrompt((None, res[1]))
+            self.main_window.SetTitle('FTP Client')
 
         _thread.start_new_thread(thread_func, (filename, path))
 
@@ -214,6 +218,8 @@ class Client:
 
     # ???????????
     def leftClickItem(self, event):
+        if self.trans_lock:
+            return
         row = self.files[event.GetIndex()]
         if row[0] == 'd':
             self.cd_button.Enable()
@@ -301,14 +307,37 @@ class Client:
 
         _thread.start_new_thread(thread_func, ())
 
+    def disableButtons(self):
+        for b in [self.connect_button,
+                  self.login_button,
+                  self.quit_button,
+                  self.upload_button,
+                  self.refresh_button,
+                  self.cd_button,
+                  self.rm_button,
+                  self.rename_button,
+                  self.download_button,
+                  self.mkd_button]:
+            b.Disable()
+
+    def enableButtions(self):
+        for b in [self.connect_button,
+                  self.login_button,
+                  self.quit_button,
+                  self.refresh_button,
+                  self.upload_button]:
+            b.Enable()
+
     def requireLock(self):
         def requireLockDec(f):
             def g(*args, **kwargs):
+                self.disableButtons()
                 if self.trans_lock:
                     return
                 self.trans_lock = True
                 f(*args, **kwargs)
                 self.trans_lock = False
+                self.enableButtions()
             return g
         return requireLockDec
 
