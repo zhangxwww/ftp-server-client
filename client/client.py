@@ -96,7 +96,6 @@ class Client:
         self.download_button.Disable()
         self.rename_button.Disable()
 
-    # ???????????
     def refresh(self, _):
         self.updatePWD()
         self.updateList()
@@ -121,20 +120,30 @@ class Client:
             return
 
         @self.requireLock()
-        def thread_func(filename, path):
-            self.main_window.SetTitle('FTP Client Uploading...')
-            cmd, res = self.ftp.STOR(filename, open(path, 'rb'))
-            if isinstance(res, str):
-                self.showPrompt((cmd, res))
-            elif isinstance(res, tuple):
-                self.showPrompt((cmd, res[0]))
-                self.showPrompt((None, res[1]))
+        def thread_func():
+            total_byte = os.path.getsize(path)
+            dialog = wx.ProgressDialog('Uploading...', '')
+
+            def getCallback(total, dia):
+                def callback(n_byte):
+                    percent = 100 * n_byte // total
+                    self.main_window.SetTitle('FTP Client Uploading... {}% finished'.format(percent))
+                    dia.Update(percent, '{}%'.format(percent))
+                return callback
+
+            cmd_, res_ = self.ftp.STOR(filename, open(path, 'rb'), getCallback(total_byte, dialog))
+
+            if isinstance(res_, str):
+                self.showPrompt((cmd_, res_))
+            elif isinstance(res_, tuple):
+                self.showPrompt((cmd_, res_[0]))
+                self.showPrompt((None, res_[1]))
             self.main_window.SetTitle('FTP Client')
-            if res[0] != '2':
+            if res_[0] != '2':
                 return
             self.updateList()
 
-        _thread.start_new_thread(thread_func, (filename, path))
+        _thread.start_new_thread(thread_func, ())
 
     def changeDir(self, _):
         dir_name = self.selected_row[1]
@@ -188,17 +197,30 @@ class Client:
             return
 
         @self.requireLock()
-        def thread_func(filename, path):
-            self.main_window.SetTitle('FTP Client Downloading...')
-            cmd, res = self.ftp.RETR(filename, open(path, 'wb'))
-            if isinstance(res, str):
-                self.showPrompt((cmd, res))
-            elif isinstance(res, tuple):
-                self.showPrompt((cmd, res[0]))
-                self.showPrompt((None, res[1]))
+        def thread_func():
+            dialog = wx.ProgressDialog('Downloading...', '')
+
+            def getCallback(dia):
+                def callback(total, cur):
+                    if total is not None:
+                        percent = 100 * cur // total
+                        self.main_window.SetTitle('FTP Client Downloading... {}% finished'.format(percent))
+                        dia.Update(percent, '{}%'.format(percent))
+                    else:
+                        self.main_window.SetTitle('FTP Client Downloading...')
+                        dia.Update(0, '{} finished'.format(self.readable_size(cur)))
+                return callback
+
+            cmd_, res_ = self.ftp.RETR(filename, open(path, 'wb'), getCallback(dialog))
+            dialog.Update(100)
+            if isinstance(res_, str):
+                self.showPrompt((cmd_, res_))
+            elif isinstance(res_, tuple):
+                self.showPrompt((cmd_, res_[0]))
+                self.showPrompt((None, res_[1]))
             self.main_window.SetTitle('FTP Client')
 
-        _thread.start_new_thread(thread_func, (filename, path))
+        _thread.start_new_thread(thread_func, ())
 
     def rename(self, _):
         old = self.selected_row[1]
@@ -216,7 +238,7 @@ class Client:
             return
         self.refresh(None)
 
-    # ???????????
+    # event handler when left click at list items
     def leftClickItem(self, event):
         if self.trans_lock:
             return
@@ -233,7 +255,6 @@ class Client:
             self.rm_button.Disable()
         self.selected_row = row
 
-    # ????????
     def execUserCmd(self, _):
         cmd = self.prompt_input.GetValue()
         self.prompt_input.Clear()
@@ -243,7 +264,7 @@ class Client:
             res = str(e)
         self.showPrompt((cmd, res))
 
-    # ?Prompt????req?res
+    # show cmd and response on the prompt
     def showPrompt(self, line):
         prompt = ''
         cmd, res = line
@@ -280,10 +301,10 @@ class Client:
 
         @self.requireLock()
         def thread_func():
-            cmd, res, lines = self.ftp.LIST(None)
-            self.showPrompt((cmd, res[0]))
-            self.showPrompt((None, res[1]))
-            if res[1][0] != '2':
+            cmd_, res_, lines = self.ftp.LIST(None)
+            self.showPrompt((cmd_, res_[0]))
+            self.showPrompt((None, res_[1]))
+            if res_[1][0] != '2':
                 return
             parsed = []
             for line in lines:
@@ -320,7 +341,7 @@ class Client:
                   self.mkd_button]:
             b.Disable()
 
-    def enableButtions(self):
+    def enableButtons(self):
         for b in [self.connect_button,
                   self.login_button,
                   self.quit_button,
@@ -337,11 +358,11 @@ class Client:
                 self.trans_lock = True
                 f(*args, **kwargs)
                 self.trans_lock = False
-                self.enableButtions()
+                self.enableButtons()
             return g
         return requireLockDec
 
-    # ??LIST????????
+    # extract file info from LIST command
     def parseListEachLine(self, line):
         line = line.strip()
         reg = re.compile(r'^([slbdpc-])[wrx-]{9}\s*\d*\s*\S*\s*\S*\s*(\d*)\s*([A-Za-z]*\s*\d*\s*\d*(:\d*)?)\s*(.*)$')
@@ -352,7 +373,7 @@ class Client:
         file_size = self.readable_size(int(file_size))
         return file_type, filename, file_size, last_modified
 
-    # ?????????
+    # generate readable size of files
     @staticmethod
     def readable_size(file_size):
         suffixes = ['B', 'KB', 'MB']
@@ -365,7 +386,7 @@ class Client:
                 break
         return str(file_size) + ' ' + suf
 
-    ########################### ??????GUI?????? ############################
+    ########################### The rest is ALL about GUI ############################
 
     def initGUI(self):
         self.main_window = wx.Frame(None, title='FTP Client', size=(640, 768))

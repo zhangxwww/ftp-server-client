@@ -42,7 +42,7 @@ void generate_pasv_response( ushort port, char res[BUF_SIZE]);
 int parse_port_request(struct sockaddr_in * addr, char param[PARAM_LEN]);
 
 // 建立数据连接
-int build_data_connect(socket_info_t * sockif, int * connfd);
+int build_data_connect(socket_info_t * sockif, int * connfd, char info[INFO_LEN]);
 
 // 清理数据连接相关信息
 void clear_data_socket(socket_info_t * sockif);

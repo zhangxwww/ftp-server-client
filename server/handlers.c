@@ -254,18 +254,27 @@ int retr(socket_info_t * sockif, char param[PARAM_LEN]) {
     }
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
-    int err;
-    int connfd;
-    err = build_data_connect(sockif, &connfd);
-    if (err != 0) {
-        error425(sockif, NULL);
-        return 1;
-    }
+
     FILE * file = fopen(param, "rb");
     if (file == NULL) {
         printf("Error can't open file %s\n", param);
         error450(sockif, NULL);
         clear_data_socket(sockif);
+        return 1;
+    }
+
+    int err;
+    int connfd;
+    struct stat st;
+    stat(param, &st);
+    int sz = st.st_size;
+    char info[INFO_LEN];
+    memset(info, 0, INFO_LEN);
+    sprintf(info, " for %s (%d bytes)", param, sz);
+    info[strlen(info)] = '\0';
+    err = build_data_connect(sockif, &connfd, info);
+    if (err != 0) {
+        error425(sockif, NULL);
         return 1;
     }
     char block[BUF_SIZE];
@@ -309,7 +318,7 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
     int connfd;
-    err = build_data_connect(sockif, &connfd);
+    err = build_data_connect(sockif, &connfd, "");
     if (err != 0) {
         error425(sockif, NULL);
         return 1;
@@ -540,7 +549,7 @@ int list (socket_info_t * sockif, char param[PARAM_LEN]) {
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
     int connfd;
-    err = build_data_connect(sockif, &connfd);
+    err = build_data_connect(sockif, &connfd, "");
     if (err != 0) {
         error425(sockif, NULL);
         return 1;

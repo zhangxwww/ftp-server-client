@@ -218,11 +218,11 @@ int parse_port_request(struct sockaddr_in * addr, char param[PARAM_LEN]) {
     return 0;
 }
 
-int build_data_connect(socket_info_t * sockif, int * connfd) {
+int build_data_connect(socket_info_t * sockif, int * connfd, char info[INFO_LEN]) {
     int err;
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
-    strncpy(res, "150 Opening BINARY mode data connection.\r\n", 42);
+    sprintf(res, "150 Opening BINARY mode data connection%s.\r\n", info);
     res[strlen(res)] = '\0';
     err = send(sockif->sockfd, res, strlen(res), 0);
     if (err < 0) {

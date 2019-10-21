@@ -2,6 +2,7 @@
 
 import socket
 import re
+import math
 
 BUF_SIZE = 8192
 PORT_PORT = 23333
@@ -55,7 +56,7 @@ class FTP:
         return cmd, self.send_command(cmd)
 
     @catchError(IOError)
-    def RETR(self, filename, f):
+    def RETR(self, filename, f, callback=None):
         if self.is_pasv:
             if not self.data_sock:
                 return None, 'No data connection'
@@ -67,11 +68,20 @@ class FTP:
             self.data_listen_sock = None
         if res150[:1] in ['4', '5']:
             return cmd, res150
+        reg = re.compile(r'\((\d*) bytes\).$')
+        match = reg.search(res150)
+        total = None
+        if match:
+            total = int(math.floor(float(match.groups()[0])))
+        cur = 0
         while True:
             data = self.data_sock.recv(BUF_SIZE)
             if not data:
                 break
             f.write(data)
+            cur += len(data)
+            if callback is not None:
+                callback(total, cur)
         res226 = self.get_response()
         self.is_pasv = None
         self.data_sock.close()
@@ -79,7 +89,7 @@ class FTP:
         return cmd, (res150, res226)
 
     @catchError(IOError)
-    def STOR(self, filename, f):
+    def STOR(self, filename, f, callback=None):
         if self.is_pasv:
             if not self.data_sock:
                 return None, 'No data connection'
@@ -91,11 +101,15 @@ class FTP:
             self.data_listen_sock = None
         if res150[:1] in ['4', '5']:
             return cmd, res150
+        n_byte = 0
         while True:
             block = f.read(BUF_SIZE)
             if not block:
                 break
             self.data_sock.sendall(block)
+            n_byte += len(block)
+            if callback is not None:
+                callback(n_byte)
         if self.data_sock is not None:
             self.data_sock.close()
             self.data_sock = None

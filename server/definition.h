@@ -25,6 +25,7 @@
 #define PATH_LEN 1024
 #define PARAM_LEN 1024
 #define ERROR_LEN 64
+#define INFO_LEN 64
 #define PASV_PORT 23333
 
 typedef unsigned short int ushort;
