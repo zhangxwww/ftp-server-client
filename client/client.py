@@ -346,7 +346,8 @@ class Client:
                   self.login_button,
                   self.quit_button,
                   self.refresh_button,
-                  self.upload_button]:
+                  self.upload_button,
+                  self.mkd_button]:
             b.Enable()
 
     def requireLock(self):

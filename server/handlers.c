@@ -43,6 +43,8 @@ cmd_info_t cmd_table[] = {
     { "",     NULL,   -1 }
 };
 
+extern char root[PATH_LEN];
+
 handler_t get_cmd_handler(char req[BUF_SIZE], int * len) {
     char cmd[5];
     memset(cmd, 0, 5);
@@ -450,7 +452,16 @@ int mkd (socket_info_t * sockif, char param[PARAM_LEN]) {
         return 1;
     }
     int err;
-    err = mkdir(param, 0777);
+    char path[PATH_LEN];
+    memset(path, 0, PATH_LEN);
+    if (param[0] == '/') {
+        sprintf(path, "/tmp%s", param);
+    }
+    else {
+        strcpy(path, param);
+    }
+    path[strlen(path)] = '\0';
+    err = mkdir(path, 0777);
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
     if (err < 0) {
@@ -476,7 +487,16 @@ int cwd (socket_info_t * sockif, char param[PARAM_LEN]) {
         return 1;
     }
     int err;
-    err = chdir(param);
+    char path[PATH_LEN];
+    memset(path, 0, PATH_LEN);
+    if (param[0] == '/') {
+        sprintf(path, "/tmp%s", param);
+    }
+    else {
+        strcpy(path, param);
+    }
+    path[strlen(path)] = '\0';
+    err = chdir(path);
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
     if (err < 0) {
@@ -496,7 +516,15 @@ int cdup (socket_info_t * sockif, char param[PARAM_LEN]) {
     if (check_login(sockif) != 0) {
         return 1;
     }
-    char path[PARAM_LEN] = "..";
+    char path[PARAM_LEN];
+    memset(path, 0, PARAM_LEN);
+    getcwd(path, PARAM_LEN);
+    if (strlen(path) == strlen(root)) {
+        error500(sockif, NULL);
+        return 1;
+    }
+    memset(path, 0, PARAM_LEN);
+    sprintf(path, "..");
     return cwd(sockif, path);
 }
 
@@ -508,7 +536,7 @@ int pwd (socket_info_t * sockif, char param[PARAM_LEN]) {
     getcwd(path, PATH_LEN);
     char res[BUF_SIZE];
     memset(res, 0, BUF_SIZE);
-    sprintf(res, "257 \"%s\"\r\n", path);
+    sprintf(res, "257 \"%s\"\r\n", path + strlen(root));
     int err = send(sockif->sockfd, res, strlen(res), 0);
     if (err < 0) {
         printf("Error PWD(): %s(%d)\n", strerror(errno), errno);
@@ -526,7 +554,16 @@ int rmd (socket_info_t * sockif, char param[PARAM_LEN]) {
         return 1;
     }
     int err;
-    err = rmdir(param);
+    char path[PATH_LEN];
+    memset(path, 0, PATH_LEN);
+    if (param[0] == '/') {
+        sprintf(path, "/tmp%s", param);
+    }
+    else {
+        strcpy(path, param);
+    }
+    path[strlen(path)] = '\0';
+    err = rmdir(path);
     char res[BUF_SIZE];
     if (err < 0) {
         printf("Error RMD(): %s(%d)\n", strerror(errno), errno);
