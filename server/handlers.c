@@ -286,6 +286,10 @@ int retr(socket_info_t * sockif, char param[PARAM_LEN]) {
     if (err != 0) {
         printf("Error fseek() fail\n");
         error451(sockif, NULL);
+        fclose(file);
+        close(connfd);
+        clear_data_socket(sockif);
+        return 1;
     }
     else {
         while(!feof(file)) {
@@ -293,6 +297,10 @@ int retr(socket_info_t * sockif, char param[PARAM_LEN]) {
             if (len != send(connfd, block, len, 0)) {
                 printf("Error occurs when sending file\n");
                 error426(sockif, NULL);
+                fclose(file);
+                close(connfd);
+                clear_data_socket(sockif);
+                return 1;
             }
         }
     }
@@ -350,6 +358,10 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
     if (err != 0) {
         printf("Error fseek() fail\n");
         error451(sockif, NULL);
+        fclose(file);
+        close(connfd);
+        clear_data_socket(sockif);
+        return 1;
     }
     else {
         while(1) {
@@ -360,7 +372,10 @@ int stor(socket_info_t * sockif, char param[PARAM_LEN]) {
             if (len != fwrite(block, 1, len, file)) {
                 printf("Error occurs when reciving file\n");
                 error426(sockif, NULL);
-                break;
+                fclose(file);
+                close(connfd);
+                clear_data_socket(sockif);
+                return 1;
             }
         }
     }

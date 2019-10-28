@@ -33,7 +33,7 @@ class FTP:
         self.ctrl_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         self.ctrl_sock.connect((host, port))
         self.file = self.ctrl_sock.makefile('r')
-        res = self.get_response()
+        res = self.getResponse()
         return None, res
 
     @catchError(IOError)
@@ -46,22 +46,29 @@ class FTP:
             self.ctrl_sock = None
 
     @catchError(IOError)
+    def shutdownDataConnection(self):
+        if self.data_sock is not None:
+            self.data_sock.shutdown(socket.SHUT_RDWR)
+            self.data_sock.close()
+            self.data_sock = None
+
+    @catchError(IOError)
     def USER(self, username):
         cmd = 'USER {}'.format(username)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def PASS(self, password):
         cmd = 'PASS {}'.format(password)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
-    def RETR(self, filename, f, callback=None):
+    def RETR(self, filename, f, callback=None, rest=0):
         if self.is_pasv:
             if not self.data_sock:
                 return None, 'No data connection'
         cmd = 'RETR {}'.format(filename)
-        res150 = self.send_command(cmd)
+        res150 = self.sendCommand(cmd)
         if not self.is_pasv:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
@@ -73,8 +80,10 @@ class FTP:
         total = None
         if match:
             total = int(math.floor(float(match.groups()[0])))
-        cur = 0
+        cur = rest
         while True:
+            if self.data_sock is None:
+                break
             data = self.data_sock.recv(BUF_SIZE)
             if not data:
                 break
@@ -82,10 +91,11 @@ class FTP:
             cur += len(data)
             if callback is not None:
                 callback(total, cur)
-        res226 = self.get_response()
+        res226 = self.getResponse()
         self.is_pasv = None
-        self.data_sock.close()
-        self.data_sock = None
+        if self.data_sock is not None:
+            self.data_sock.close()
+            self.data_sock = None
         return cmd, (res150, res226)
 
     @catchError(IOError)
@@ -94,7 +104,7 @@ class FTP:
             if not self.data_sock:
                 return None, 'No data connection'
         cmd = 'STOR {}'.format(filename)
-        res150 = self.send_command(cmd)
+        res150 = self.sendCommand(cmd)
         if not self.is_pasv:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
@@ -113,31 +123,31 @@ class FTP:
         if self.data_sock is not None:
             self.data_sock.close()
             self.data_sock = None
-        res226 = self.get_response()
+        res226 = self.getResponse()
         self.is_pasv = None
         return cmd, (res150, res226)
 
     @catchError(IOError)
     def REST(self, rest):
         cmd = 'REST {}'.format(rest)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def QUIT(self):
         cmd = 'QUIT'
-        res = self.send_command(cmd)
+        res = self.sendCommand(cmd)
         self.exit()
         return cmd, res
 
     @catchError(IOError)
     def SYST(self):
         cmd = 'SYST'
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def TYPE(self, t):
         cmd = 'TYPE {}'.format(t)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def PORT(self):
@@ -157,7 +167,7 @@ class FTP:
         h = host.split('.')
         p = [port // 256, port % 256]
         cmd = 'PORT {}'.format(','.join(map(str, h + p)))
-        res = self.send_command(cmd)
+        res = self.sendCommand(cmd)
         self.is_pasv = False
         self.data_listen_sock = sock
         return cmd, res
@@ -165,7 +175,7 @@ class FTP:
     @catchError(IOError)
     def PASV(self):
         cmd = 'PASV'
-        res = self.send_command(cmd)
+        res = self.sendCommand(cmd)
         reg = re.compile(r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)')
         match = reg.search(res)
         if not match:
@@ -180,22 +190,22 @@ class FTP:
     @catchError(IOError)
     def MKD(self, dir_name):
         cmd = 'MKD {}'.format(dir_name)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def CWD(self, dir_name):
         cmd = 'CWD {}'.format(dir_name)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def CDUP(self):
         cmd = 'CDUP'
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def PWD(self):
         cmd = 'PWD'
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def LIST(self, name):
@@ -207,7 +217,7 @@ class FTP:
             cmd = cmd + ' '.join(name)
         elif isinstance(name, str):
             cmd = cmd + ' ' + name
-        res150 = self.send_command(cmd)
+        res150 = self.sendCommand(cmd)
         if not self.is_pasv:
             self.data_sock = self.data_listen_sock.accept()[0]
             self.data_listen_sock.close()
@@ -223,7 +233,7 @@ class FTP:
                 elif line[-1:] in ['\r', '\n']:
                     line = line[:-1]
                 lines.append(line)
-        res226 = self.get_response()
+        res226 = self.getResponse()
         self.is_pasv = None
         self.data_sock.close()
         self.data_sock = None
@@ -232,30 +242,30 @@ class FTP:
     @catchError(IOError)
     def RMD(self, dir_name):
         cmd = 'RMD {}'.format(dir_name)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def RNFR(self, old_name):
         cmd = 'RNFR {}'.format(old_name)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     @catchError(IOError)
     def RNTO(self, new_name):
         cmd = 'RNTO {}'.format(new_name)
-        return cmd, self.send_command(cmd)
+        return cmd, self.sendCommand(cmd)
 
     # 发送指令并返回response
-    def send_command(self, cmd):
-        self.send_request(cmd)
-        return self.get_response()
+    def sendCommand(self, cmd):
+        self.sendRequest(cmd)
+        return self.getResponse()
 
     # 获取多行response
-    def get_response(self):
-        line = self.parse_single_line()
+    def getResponse(self):
+        line = self.parseSingleLine()
         if line[3:4] == '-':
             code = line[:3]
             while True:
-                nextline = self.parse_single_line()
+                nextline = self.parseSingleLine()
                 line = line + '\n' + nextline
                 if nextline[:3] == code:
                     if nextline[3:4] == ' ':
@@ -263,7 +273,7 @@ class FTP:
         return line
 
     # 接受一行response并取出换行符
-    def parse_single_line(self):
+    def parseSingleLine(self):
         line = self.file.readline(BUF_SIZE + 1)
         if not line:
             raise EOFError
@@ -273,6 +283,6 @@ class FTP:
             line = line[:-1]
         return line
 
-    def send_request(self, req):
+    def sendRequest(self, req):
         req = req.strip() + '\r\n'
         self.ctrl_sock.sendall(req.encode())

@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "definition.h"
 #include "utils.h"
@@ -37,6 +38,8 @@ void process_func(socket_info_t * sockif);
 void exit_process(socket_info_t * sockif);
 
 int main(int argc, char **argv) {
+    signal(SIGPIPE, SIG_IGN);
+
     int listenfd;		//监听socket和连接socket不一样，后者用于数据传输
     struct sockaddr_in addr;
 

@@ -11,7 +11,7 @@ import ftp
 class Client:
     def __init__(self):
 
-        # ??????
+        # widgets
         self.main_window = None
         self.ip_input = None
         self.port_input = None
@@ -31,12 +31,18 @@ class Client:
         self.rm_button = None
         self.rename_button = None
         self.download_button = None
+        self.pause_resume_button = None
         self.mkd_button = None
 
         self.files = []
         self.selected_row = None
         self.connected = False
         self.trans_lock = False
+
+        self.broken_path = None
+        self.broken_file = None
+        self.rest_off = 0
+        self.pause = False
 
         self.ftp = ftp.FTP()
         self.app = wx.App()
@@ -107,6 +113,7 @@ class Client:
             return
         path = file_dialog.GetPath()
         filename = path.split(os.sep)[-1]
+
         cmd, res = self.ftp.TYPE('I')
         self.showPrompt((cmd, res))
         if res[0] != '2':
@@ -122,16 +129,14 @@ class Client:
         @self.requireLock()
         def thread_func():
             total_byte = os.path.getsize(path)
-            dialog = wx.ProgressDialog('Uploading...', '')
 
-            def getCallback(total, dia):
+            def getCallback(total):
                 def callback(n_byte):
                     percent = 100 * n_byte // total
-                    self.main_window.SetTitle('FTP Client Uploading... {}% finished'.format(percent))
-                    dia.Update(percent, '{}%'.format(percent))
+                    self.main_window.SetTitle('FTP Client Uploading... {}% processed'.format(percent))
                 return callback
 
-            cmd_, res_ = self.ftp.STOR(filename, open(path, 'rb'), getCallback(total_byte, dialog))
+            cmd_, res_ = self.ftp.STOR(filename, open(path, 'rb'), getCallback(total_byte))
 
             if isinstance(res_, str):
                 self.showPrompt((cmd_, res_))
@@ -139,7 +144,7 @@ class Client:
                 self.showPrompt((cmd_, res_[0]))
                 self.showPrompt((None, res_[1]))
             self.main_window.SetTitle('FTP Client')
-            if res_[0] != '2':
+            if res_[1][0] != '2':
                 return
             self.updateList()
 
@@ -178,12 +183,16 @@ class Client:
     def download(self, _):
         save_dialog = wx.FileDialog(self.main_window,
                                     message='Choose upload file',
-                                    style=wx.FD_SAVE |wx.FD_OVERWRITE_PROMPT)
+                                    style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         save_res = save_dialog.ShowModal()
         if save_res != wx.ID_OK:
             return
         path = save_dialog.GetPath()
         filename = self.selected_row[1]
+
+        self.broken_file = filename
+        self.broken_path = path
+
         cmd, res = self.ftp.TYPE('I')
         self.showPrompt((cmd, res))
         if res[0] != '2':
@@ -198,27 +207,31 @@ class Client:
 
         @self.requireLock()
         def thread_func():
-            dialog = wx.ProgressDialog('Downloading...', '')
 
-            def getCallback(dia):
+            def getCallback():
                 def callback(total, cur):
+                    self.rest_off = cur
                     if total is not None:
                         percent = 100 * cur // total
-                        self.main_window.SetTitle('FTP Client Downloading... {}% finished'.format(percent))
-                        dia.Update(percent, '{}%'.format(percent))
+                        self.main_window.SetTitle('FTP Client Downloading... {}% processed'.format(percent))
                     else:
                         self.main_window.SetTitle('FTP Client Downloading...')
-                        dia.Update(0, '{} finished'.format(self.readable_size(cur)))
+
                 return callback
 
-            cmd_, res_ = self.ftp.RETR(filename, open(path, 'wb'), getCallback(dialog))
-            dialog.Update(100)
+            cmd_, res_ = self.ftp.RETR(filename, open(path, 'wb'), getCallback())
             if isinstance(res_, str):
                 self.showPrompt((cmd_, res_))
             elif isinstance(res_, tuple):
                 self.showPrompt((cmd_, res_[0]))
                 self.showPrompt((None, res_[1]))
             self.main_window.SetTitle('FTP Client')
+
+            if not self.pause:
+                self.type = None
+                self.broken_file = None
+                self.broken_path = None
+                self.rest_off = 0
 
         _thread.start_new_thread(thread_func, ())
 
@@ -237,6 +250,61 @@ class Client:
         if res[0] != '2':
             return
         self.refresh(None)
+
+    def pause_resume(self, _):
+        if self.pause:
+            self.pause = False
+            self.pause_resume_button.SetLabelText('Pause')
+            path = self.broken_path
+            filename = self.broken_file
+            cmd, res = self.ftp.TYPE('I')
+            self.showPrompt((cmd, res))
+            if res[0] != '2':
+                return
+            if self.pasv_box.GetValue():
+                cmd, res = self.ftp.PASV()
+            else:
+                cmd, res = self.ftp.PORT()
+            self.showPrompt((cmd, res))
+            if res[0] != '2':
+                return
+            cmd, res = self.ftp.REST(self.rest_off)
+            self.showPrompt((cmd, res))
+
+            @self.requireLock()
+            def thread_func():
+                def getCallback(_):
+                    def callback(total, cur):
+                        self.rest_off = cur
+                        if total is not None:
+                            percent = 100 * cur // total
+                            self.main_window.SetTitle('FTP Client Downloading... {}% processed'.format(percent))
+                        else:
+                            self.main_window.SetTitle('FTP Client Downloading...')
+
+                    return callback
+
+                cmd_, res_ = self.ftp.RETR(filename, open(path, 'ab'), getCallback(None), os.path.getsize(path))
+                if isinstance(res_, str):
+                    self.showPrompt((cmd_, res_))
+                elif isinstance(res_, tuple):
+                    self.showPrompt((cmd_, res_[0]))
+                    self.showPrompt((None, res_[1]))
+                self.main_window.SetTitle('FTP Client')
+                if res_[1][0] != '2':
+                    return
+                if not self.pause:
+                    self.broken_file = None
+                    self.broken_path = None
+                    self.rest_off = 0
+                    self.type = None
+
+            _thread.start_new_thread(thread_func, ())
+
+        elif self.rest_off != 0:
+            self.ftp.shutdownDataConnection()
+            self.pause_resume_button.SetLabelText('Resume')
+            self.pause = True
 
     # event handler when left click at list items
     def leftClickItem(self, event):
@@ -259,7 +327,7 @@ class Client:
         cmd = self.prompt_input.GetValue()
         self.prompt_input.Clear()
         try:
-            res = self.ftp.send_command(cmd)
+            res = self.ftp.sendCommand(cmd)
         except IOError as e:
             res = str(e)
         self.showPrompt((cmd, res))
@@ -360,7 +428,9 @@ class Client:
                 f(*args, **kwargs)
                 self.trans_lock = False
                 self.enableButtons()
+
             return g
+
         return requireLockDec
 
     # extract file info from LIST command
@@ -412,6 +482,7 @@ class Client:
         self.cd_button.Bind(wx.EVT_BUTTON, self.changeDir)
         self.rm_button.Bind(wx.EVT_BUTTON, self.removeDir)
         self.download_button.Bind(wx.EVT_BUTTON, self.download)
+        self.pause_resume_button.Bind(wx.EVT_BUTTON, self.pause_resume)
         self.rename_button.Bind(wx.EVT_BUTTON, self.rename)
         self.mkd_button.Bind(wx.EVT_BUTTON, self.makeDir)
         self.file_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.leftClickItem)
@@ -506,6 +577,7 @@ class Client:
         lower_box = wx.BoxSizer(wx.HORIZONTAL)
         lower_lower_box = wx.BoxSizer(wx.HORIZONTAL)
         upload = wx.Button(panel, -1, 'Upload')
+        pause_resume = wx.Button(panel, -1, 'Pause')
         download = wx.Button(panel, -1, 'Download')
         mkd = wx.Button(panel, -1, 'Make Directory')
         rename = wx.Button(panel, -1, 'Rename')
@@ -521,6 +593,7 @@ class Client:
 
         lower_box.Add(refresh, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(upload, 0, wx.ALL | wx.CENTER, 5)
+        lower_box.Add(pause_resume, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(mkd, 0, wx.ALL | wx.CENTER, 5)
         lower_box.Add(download, 0, wx.ALL | wx.CENTER, 5)
         lower_lower_box.Add(rename, 0, wx.ALL | wx.CENTER, 5)
@@ -537,6 +610,7 @@ class Client:
         self.file_list = file_list
         self.upload_button = upload
         self.download_button = download
+        self.pause_resume_button = pause_resume
         self.rename_button = rename
         self.cd_button = cd
         self.rm_button = rm
@@ -557,7 +631,8 @@ class Client:
         self.file_list.SetColumnWidth(2, 150)
         self.file_list.SetColumnWidth(3, 150)
 
-# ??????????
+
+# whether the input of port is valid
 class PortValidator(wx.Validator):
     def __init__(self):
         wx.Validator.__init__(self)
