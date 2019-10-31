@@ -370,6 +370,7 @@ class Client:
         @self.requireLock()
         def thread_func():
             cmd_, res_, lines = self.ftp.LIST(None)
+            print(lines)
             self.showPrompt((cmd_, res_[0]))
             self.showPrompt((None, res_[1]))
             if res_[1][0] != '2':
@@ -383,6 +384,9 @@ class Client:
             if len(parsed) > 0 and parsed[0][1][:1] != '.':
                 parsed.insert(0, ('d', '.', '', ''))
             if len(parsed) > 1 and parsed[1][1][:2] != '..':
+                parsed.insert(1, ('d', '..', '', ''))
+            if len(parsed) == 0:
+                parsed.insert(0, ('d', '.', '', ''))
                 parsed.insert(1, ('d', '..', '', ''))
             self.file_list.ClearAll()
             self.file_list.AppendColumn('Type')
