@@ -370,7 +370,6 @@ class Client:
         @self.requireLock()
         def thread_func():
             cmd_, res_, lines = self.ftp.LIST(None)
-            print(lines)
             self.showPrompt((cmd_, res_[0]))
             self.showPrompt((None, res_[1]))
             if res_[1][0] != '2':
